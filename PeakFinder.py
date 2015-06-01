@@ -1,0 +1,292 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+#  PeakFinder.py
+#
+#  Provides a simple way of finding peaks and their parameters, 
+#  from a data series
+#  
+#  Copyright 2014 Andre Almeida <andre.almeida@univ-lemans.fr>
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+#  
+#  
+
+""" Defines a class for detecting peaks in a numpy array"""
+
+import numpy as np
+
+class PeakFinder(object):
+
+    def __init__(self, x, npeaks=None, minrattomax=None, minval=0):
+        """Creates the peak finder object from a numpy array
+        
+        Arguments: 
+        
+            x:           the numpy array in which to find peaks
+            npeaks:      maximum number of peaks to find
+            
+          Thresholds:
+            minrattomax: ratio of minimum to maximum peak amplitude
+                         (has priority over minval if set to other
+                          than None)
+            minval:      an absolute minimum value of peak
+        """
+        
+        
+        
+        self.x = np.array(x)
+        self.pos = np.array([])
+        self.val = np.array([])
+        if minrattomax is None:
+            self.minamp = minval
+        else:
+            self.minamp = self.x.max()*self.minrattomax
+            
+        self.sorttype = 0
+        
+        if not npeaks:
+            self.npeaks = len(self.x)
+        else:
+            self.npeaks = npeaks
+        
+        self.findpos()
+        self.sort_pos()
+        #self.boundaries()
+        
+        
+    def findpos(self):
+        """Finds the peaks positions
+        
+        Arguments:
+            (none)
+        """
+        
+        x=self.x
+        
+        peakmask = (x[0:-2]<=x[1:-1])*(x[1:-1]>=x[2:]).astype(int)
+        pkmskamp = peakmask*x[1:-1]
+        
+        pos=[]
+        
+        m = pkmskamp.max()
+        b = pkmskamp.argmax()
+        th = self.minamp
+        n = 1
+        pos.append(b+1)
+        pkmskamp[b] = 0
+        
+        while m>th and n<self.npeaks:
+            m = pkmskamp.max()
+            b = pkmskamp.argmax()
+            if m>th:
+                pos.append(b+1)
+                pkmskamp[b] = 0
+                n+= 1
+        
+        self.pos = np.array(pos)
+        self.val = x[self.pos]
+        
+        
+    def plot(self, logarithmic=False):
+        """Plot a graphical representation of the peaks
+        
+        Arguments:
+            (none)
+        """
+    
+        import pylab as pl
+        
+        pl.figure()
+        pl.plot(self.x)
+        pl.hold('on')
+        pl.plot(self.pos,self.val,'o')
+        if hasattr(self,'bounds'):
+            lmins = np.unique(self.bounds.flatten())
+            lminvals = self.x[lmins]
+            pl.plot(lmins,lminvals,'or')
+        if hasattr(self, 'fpos'):
+            pl.plot(self.fpos, self.fval,'oc')
+        pl.hold('off')
+        if logarithmic:
+            pl.gca().set_yscale('log')
+        
+        
+    def sort_ampl(self):
+        """Sort the found peaks in decreasing order of amplitude
+        
+        Arguments:
+            (none)
+        """
+        
+        idx = np.argsort(self.val)[::-1]
+        self.pos = self.pos[idx]
+        self.val = self.val[idx]
+        self.sorttype = 2
+        
+    def sort_pos(self):
+        """Sort the found peaks in order of position
+        
+        Arguments:
+            (none)
+        """
+        
+        idx = np.argsort(self.pos)
+        
+        self.pos = self.pos[idx]
+        self.val = self.val[idx]
+        self.sorttype = 1
+        
+    def boundaries(self):
+        """Find the local minima on either side of each peak
+        
+        Arguments:
+            (none)
+        """
+
+        prevb = np.argmin(self.x[0:self.pos[0]])
+        
+        bounds = []
+        
+        npks = len(self.pos)
+        
+        if self.sorttype != 1:
+            self.sort_pos()
+        
+        for i in range(npks):
+            thismax = self.pos[i]
+            if i<npks-1:
+                nextmax = self.pos[i+1]
+                relb = np.argmin(self.x[thismax:nextmax])
+                nextb = relb + thismax
+            else:
+                nextmax = len(self.x)-1
+                nextb = len(self.x)-1
+                
+            bounds.append([prevb,nextb])
+            prevb = nextb
+            
+        self.bounds = np.array(bounds)
+    
+    def refine(self, idx, fun=None, xvec=None):
+        """use quadratic interpolation to locate a fine maximum of
+        the peak position and value
+        
+        Arguments:
+            idx: index of the peak to interpolate
+        """
+        
+        pos = self.pos[idx]
+        if xvec is not None:
+            x=xvec
+        else:
+            x=self.x
+            
+        if fun:
+            from scipy.optimize import broyden1 as opt
+            #val = fun(self.val[idx])
+            sur = fun(x[pos-1:pos+2])
+        else:
+            #val = self.val[idx]
+            sur = x[pos-1:pos+2]
+        
+        
+        if sur[1]>sur[0] and sur[1]>sur[2]:
+            c = sur[1]
+            b = (sur[2] - sur[0])/2
+            a = (sur[2] + sur[0])/2 - c
+        
+            lpos = - b/2/a 
+            fpos = float(pos) + lpos 
+            if fun:
+                ival = a*lpos*lpos + b*lpos + c
+                #print "rpos = %d; rf(val) = %f; f(val) = %f; dpos = %f;"%(pos,sur[1],ival, lpos)
+                fval = opt(lambda x:fun(x)-ival, self.val[idx]/2)
+            else:
+                fval = a*lpos*lpos + b*lpos + c
+                #print "rpos = %d; rval = %f; val = %f; dpos = %f; pos = %f"%(pos,sur[1],fval, lpos, fpos)
+                
+        else:
+            fpos = pos
+            fval = sur[1]
+            
+        return fpos,fval.tolist()
+
+    def refine_all(self, logarithmic=False):
+        """use quadratic interpolation to refine all peaks
+        
+        Arguments:
+            idx: index of the peak to interpolate
+        """
+        
+        if logarithmic:
+            x = np.log10(self.x)
+        
+        rpos = self.pos
+        rval = self.val
+        self.fpos = np.zeros(self.pos.shape)
+        self.fval = np.zeros(self.pos.shape)
+        
+        for i in range(len(self.pos)):
+            if logarithmic:
+                fpos,fval = self.refine(i,xvec=x)
+            else:
+                fpos,fval = self.refine(i)
+            self.fpos[i] = fpos
+            if logarithmic:
+                self.fval[i] = 10**fval
+            else:
+                self.fval[i] = fval
+                
+    def get_pos(self, rough=False):
+        """return a vector with peak position
+        
+        Arguments:
+            rough: do not return the refined position
+        """
+        
+        if hasattr(self, 'fpos') and not rough:
+            return self.fpos
+        else:
+            return self.pos
+
+    def get_val(self, rough=False):
+        """return a vector with peak position
+        
+        Arguments:
+            rough: do not return the refined position
+        """
+        
+        if hasattr(self, 'fpos') and not rough:
+            return self.fval
+        else:
+            return self.val
+ 
+    
+    def get_pos_val(self, rough=False):
+        """return a vector with peak position in first column
+        and value in second column
+        
+        Arguments:
+            rough: do not return the refined position
+        """
+        
+        if hasattr(self, 'fpos') and not rough:
+            rvec = np.array(zip(self.fpos,self.fval))
+        else:
+            rvec = np.array(zip(self.pos,self.val))
+            
+        return rvec

@@ -48,13 +48,13 @@ class PeakFinder(object):
         
         
         
-        self.x = np.array(x)
+        self.x = np.array(np.squeeze(x))
         self.pos = np.array([])
         self.val = np.array([])
         if minrattomax is None:
             self.minamp = minval
         else:
-            self.minamp = self.x.max()*self.minrattomax
+            self.minamp = self.x.max()*minrattomax
             
         self.sorttype = 0
         
@@ -67,6 +67,26 @@ class PeakFinder(object):
         self.sort_pos()
         #self.boundaries()
         
+    def filter_by_salience(self, rad=1):
+        ''' Filters the peaks by salience. 
+            Any peak that is lower than the neighbouring 'rad' points 
+            is filtered out
+        '''
+        
+        npks = len(self.pos)
+        #keep = np.ones(npks).astype('bool')
+        
+        for idx in range(npks):
+            thispos = self.pos[idx]
+            thisval = self.val[idx]
+            wmin = max(thispos-rad,1)
+            wmax = min(thispos+rad,len(self.x))
+            w = self.x[wmin:wmax+1]
+            
+            if any(w>thisval):
+                self.keep[idx]=False
+        
+        #self.keep = np.logical_and(self.keep,keep)
         
     def findpos(self):
         """Finds the peaks positions
@@ -99,6 +119,7 @@ class PeakFinder(object):
         
         self.pos = np.array(pos)
         self.val = x[self.pos]
+        self.keep = np.ones(len(self.pos)).astype('bool')
         
         
     def plot(self, logarithmic=False):
@@ -113,13 +134,14 @@ class PeakFinder(object):
         pl.figure()
         pl.plot(self.x)
         pl.hold('on')
-        pl.plot(self.pos,self.val,'o')
+        pl.plot(self.pos[self.keep],self.val[self.keep],'og')
+        pl.plot(self.pos[np.logical_not(self.keep)],self.val[np.logical_not(self.keep)],'om')
         if hasattr(self,'bounds'):
             lmins = np.unique(self.bounds.flatten())
             lminvals = self.x[lmins]
             pl.plot(lmins,lminvals,'or')
         if hasattr(self, 'fpos'):
-            pl.plot(self.fpos, self.fval,'oc')
+            pl.plot(self.fpos[self.keep], self.fval[self.keep],'dg')
         pl.hold('off')
         if logarithmic:
             pl.gca().set_yscale('log')
@@ -135,6 +157,7 @@ class PeakFinder(object):
         idx = np.argsort(self.val)[::-1]
         self.pos = self.pos[idx]
         self.val = self.val[idx]
+        self.keep = self.keep[idx]
         self.sorttype = 2
         
     def sort_pos(self):
@@ -148,6 +171,7 @@ class PeakFinder(object):
         
         self.pos = self.pos[idx]
         self.val = self.val[idx]
+        self.keep = self.keep[idx]
         self.sorttype = 1
         
     def boundaries(self):
@@ -180,6 +204,34 @@ class PeakFinder(object):
             prevb = nextb
             
         self.bounds = np.array(bounds)
+ 
+    def refine_opt(self, idx, xvec=None, rad=2):
+        """use fit to quadratic to locate a fine maximum of
+        the peak position and value
+        
+        Arguments:
+            idx: index of the peak to interpolate
+        """
+        
+        pos = self.pos[idx]
+        if xvec is not None:
+            x=xvec
+        else:
+            x=self.x
+            
+        #val = self.val[idx]
+        imin = max(1,pos-rad)
+        imax = min(pos+rad+1,len(x))
+        sur = x[imin:imax]
+        ifit = np.arange(imin-pos,imax-pos)
+        
+        pp = np.polyfit(ifit,sur,2)
+        lpos = - pp[1]/2.0/pp[0] 
+        fpos = float(pos) + lpos 
+        fval = pp[0]*lpos*lpos + pp[1]*lpos + pp[2]
+            
+        return fpos,fval.tolist()
+
     
     def refine(self, idx, fun=None, xvec=None):
         """use quadratic interpolation to locate a fine maximum of
@@ -225,7 +277,7 @@ class PeakFinder(object):
             
         return fpos,fval.tolist()
 
-    def refine_all(self, logarithmic=False):
+    def refine_all(self, logarithmic=False,rad=1):
         """use quadratic interpolation to refine all peaks
         
         Arguments:
@@ -242,9 +294,15 @@ class PeakFinder(object):
         
         for i in range(len(self.pos)):
             if logarithmic:
-                fpos,fval = self.refine(i,xvec=x)
+                if rad > 1:
+                    fpos,fval = self.refine_opt(i,xvec=x,rad=rad)
+                else:
+                    fpos,fval = self.refine(i,xvec=x)
             else:
-                fpos,fval = self.refine(i)
+                if rad > 1:
+                    fpos,fval = self.refine_opt(i,rad=rad)
+                else:
+                    fpos,fval = self.refine(i)
             self.fpos[i] = fpos
             if logarithmic:
                 self.fval[i] = 10**fval
@@ -259,9 +317,9 @@ class PeakFinder(object):
         """
         
         if hasattr(self, 'fpos') and not rough:
-            return self.fpos
+            return self.fpos[self.keep]
         else:
-            return self.pos
+            return self.pos[self.keep]
 
     def get_val(self, rough=False):
         """return a vector with peak position
@@ -271,11 +329,30 @@ class PeakFinder(object):
         """
         
         if hasattr(self, 'fpos') and not rough:
-            return self.fval
+            return self.fval[self.keep]
         else:
-            return self.val
- 
+            return self.val[self.keep]
+        
+        
+    def calc_individual_area(self, idx, funct=None, max_rad=None):
+        lims = self.bounds[idx]
+        if funct is None:
+            return sum(self.x[lims[0]:lims[-1]])
+        else:
+            return sum(funct(self.x[lims[0]:lims[-1]]))
     
+    def get_areas(self, funct=None, max_rad=None):
+        if not hasattr(self,'bounds'):
+            self.boundaries()
+            
+        areas=[]
+        for idx in range(len(self.pos)):
+            areas.append(self.calc_individual_area(idx, funct=funct))
+        
+        self.areas=np.array(areas)
+        
+        return self.areas[self.keep]
+        
     def get_pos_val(self, rough=False):
         """return a vector with peak position in first column
         and value in second column
@@ -285,8 +362,9 @@ class PeakFinder(object):
         """
         
         if hasattr(self, 'fpos') and not rough:
-            rvec = np.array(zip(self.fpos,self.fval))
+            rvec = np.array(zip(self.fpos[self.keep],self.fval[self.keep]))
         else:
-            rvec = np.array(zip(self.pos,self.val))
+            rvec = np.array(zip(self.pos[self.keep],self.val[self.keep]))
             
         return rvec
+  

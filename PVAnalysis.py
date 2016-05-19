@@ -533,7 +533,7 @@ class RegPartial(object):
         ph = np.cumsum(2*np.pi*f/sr)
         ph = ph-ph[sref]+phref
         
-        return mag * np.cos(ph), (self.start_idx - 1)*hop
+        return mag * np.cos(ph), (self.start_idx)*hop
         
 class SinSum(object):
     def __init__(self, sr, nfft=1024, hop=512):
@@ -770,7 +770,8 @@ class SinSum(object):
         pl.show()
         
     def synth(self,sr,hop):
-        w = np.zeros((max(self.end)+1)*hop)
+        # fixme: why +2??? 
+        w = np.zeros((max(self.end)+2)*hop)
         for part in self.partial:
             wi, spl_st = part.synth(sr,hop)
             if spl_st>=0:

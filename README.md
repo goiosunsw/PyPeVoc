@@ -1,6 +1,8 @@
 # PyPeVoc
 
-PyPeVoc is a simple Phase Vocoder library intendend mostly to analysis of sounds. It aims to be flexible and easy to adapt, and is thus entirely written in Python, rathe than using some components in C, which would make it faster but harder to maintain.
+**PyPeVoc** is a simple Phase Vocoder library intendend mostly to analysis of sounds. It aims to be flexible and easy to adapt, and is thus entirely written in Python, rathe than using some components in C, which would make it faster but harder to maintain.
+
+Unlike other Phase vocoders, **PyPeVoc** keepsthe phase information of each sine wave, so that resynthesised waveforms match the original as close as possible. Other Phase Vocoders nly keep magnitude information. This is not a problem for the sound, but it is for analysis. 
 
 ## Phase Vocoder
 

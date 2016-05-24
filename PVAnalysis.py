@@ -27,6 +27,7 @@
 
 import numpy as np
 import pylab as pl
+import sys
 
 from PeakFinder import PeakFinder as pf
 
@@ -127,8 +128,10 @@ class PV:
         # precise frequency options
         freq = dphw / self.dt / pi2
         # search among neighboring bins for the right freq
-        ii = np.argmin(abs(self.fbin[nbin]-freq))
-        return freq[ii]
+        df = self.fbin[nbin]-freq
+        ii = np.argmin(abs(df))
+
+        return freq[ii], df[ii]
         #return self.fbin[nbin]
         
     def calc_fft_frame(self, pos):
@@ -164,13 +167,14 @@ class PV:
         f=[]
         mag=[]
         ph=[]
+        realph=[]
         
         # for each peak
         for ipk, nbin in enumerate(pk):
             thisph = np.angle(fx[nbin])
             # pahse difference
             dph = np.angle(frat[nbin])
-            freq = self.dphase2freq(dph,nbin)
+            freq, df = self.dphase2freq(dph,nbin)
                 
             if freq > 0.0:
                 f.append(freq)
@@ -181,15 +185,18 @@ class PV:
                 #mag.append(np.sqrt(pkf.calc_individual_area(ipk,funct=lambda x:x*x)))
                 
                 ph.append(thisph)
+                
+                realph.append(thisph + np.pi * df/self.fstep)
             
         self.oldfft = fx
-        return f, mag, ph
+        return f, mag, ph, realph
         
     def run_pv(self):
         
         allf=[]
         allmag=[]
         allph=[]
+        allrealph=[]
         t=[]
         
         curpos = 0
@@ -198,16 +205,19 @@ class PV:
             f = np.zeros(self.npeaks)
             mag = np.zeros(self.npeaks)
             ph = np.zeros(self.npeaks)
+            realph = np.zeros(self.npeaks)
             
-            ff, magf, phf = self.calc_pv_frame(curpos)
+            ff, magf, phf, realf = self.calc_pv_frame(curpos)
             
             f[0:len(ff)]=ff
             mag[0:len(magf)]=magf
             ph[0:len(phf)]=phf
+            realph[0:len(realf)]=realf
             
             allf.append(f)
             allmag.append(mag)
             allph.append(ph)
+            allrealph.append(realph)
             
             t.append((curpos+self.nfft/2.0)/self.sr)
             
@@ -216,6 +226,7 @@ class PV:
         self.f = np.array(allf)
         self.mag = np.array(allmag)
         self.ph = np.array(allph)
+        self.realph = np.array(allrealph)
         #time values
         self.t = np.array(t)
         self.nframes = len(t)
@@ -241,7 +252,7 @@ class PV:
             # pfr = self.ph[fr,idx]
             # for f,mag,ph in zip(ffr,mfr,pfr):
             #     ss.add_point(fr,f,mag,ph,maxpitchjmp=maxpitchjmp)
-            ss.add_frame(fr,self.f[fr,:],self.mag[fr,:],self.ph[fr,:])
+            ss.add_frame(fr,self.f[fr,:],self.mag[fr,:],self.ph[fr,:],realph=self.realph[fr,:])
         return ss
         
     def plot_time_freq(self, colors=True):
@@ -340,7 +351,7 @@ class PVHarmonic(PV):
             thisph = np.angle(fx[nbin])
             # pahse difference
             dph = np.angle(frat[nbin])
-            freq = self.dphase2freq(dph,nbin)
+            freq, df = self.dphase2freq(dph,nbin)
             #freq = ipk*f0
                 
 
@@ -454,23 +465,32 @@ class RegPartial(object):
         
         self.start_idx = istart
         
+        
         if pdict is None:
             self.f  = []
             self.mag= []
             self.ph = []
+            self.realph = []
         else:
             self.f  = pdict['f']
             self.mag= pdict['mag']
             self.ph = pdict['ph']
-            
+            try:
+                self.realph = pdict['realph']
+            except KeyError:
+                self.realph = pdict['ph']
         
-    def append_point(self,f,mag,ph):
+    def append_point(self,f,mag,ph,realph=None):
         '''
         Add a single point to the end of partial
         '''
         self.f.append(f)
         self.mag.append(mag)
         self.ph.append(ph)
+        if realph is None:
+            self.realph.append(ph)
+        else:
+            self.realph.append(realph)
 
     def prepend_point(self,f,mag,ph):
         '''
@@ -505,6 +525,9 @@ class RegPartial(object):
         '''
         Resynthesise the sinusoidal partial at sampling rate sr
         '''
+        # frequency values are delayed by 1/2 frame
+        fdel = -hop/float(sr)/2.
+        
         
         # reference phase
         iref  = np.argmax(self.mag)
@@ -527,11 +550,33 @@ class RegPartial(object):
         
         # time of samples
         t   = np.arange(round(tmin*sr),round(tmax*sr))/sr
-        f   = np.interp(t,tfr,ffr)
+        f   = np.interp(t+fdel,tfr,ffr)
         mag = np.interp(t,tfr,mfr)
         
         ph = np.cumsum(2*np.pi*f/sr)
-        ph = ph-ph[sref]+phref
+        
+        
+        # phase correction to match original phase
+        phcorfr = np.zeros_like(self.ph)
+        
+        
+        for nfr, phor in enumerate(self.ph):
+            nsam = nfr*hop
+            phcorfr[nfr] = phor-np.mod(ph[nsam], 2*np.pi)
+            if phcorfr[nfr]-phcorfr[nfr-1]>np.pi:
+                phcorfr[nfr]-=2*np.pi
+            if phcorfr[nfr]-phcorfr[nfr-1]<-np.pi:
+                phcorfr[nfr]+=2*np.pi
+            # if phcorfr[nfr]>np.pi:
+            #     phcorfr[nfr]-=2*np.pi
+            # if phcorfr[nfr]<-np.pi:
+            #     phcorfr[nfr]+=2*np.pi
+            
+        phcorfr=np.insert(phcorfr,0,0.0)
+        phcorfr=np.append(phcorfr,0.0)
+        phcor = np.interp(t,tfr,phcorfr)
+        
+        ph = ph + phcor
         
         return mag * np.cos(ph), (self.start_idx)*hop
         
@@ -608,7 +653,7 @@ class SinSum(object):
         part.append_point(f,mag,ph)
         self.end[idx] = fr
         
-    def add_frame(self, fr, f, mag, ph, maxpitchjmp = 0.5):
+    def add_frame(self, fr, f, mag, ph, realph=None, maxpitchjmp = 0.5):
 
         # process new peaks in decreasing magnitude
         irev = np.argsort(mag)
@@ -617,12 +662,19 @@ class SinSum(object):
         fsrt = f[idx]
         msrt = mag[idx]
         psrt = ph[idx]
+        if realph is None:
+            rsrt = ph[idx]
+            
+        else:
+            rsrt = realph[idx]
 
         #partials = self.get_partials_at_frame(fr-1)
         pidx = self.get_partials_idx_ending_at_frame(fr-1)
         # if there are some previous partials...
         if len(pidx)>0:
+            # get all magnitudes in previous frame
             pmag = [self.partial[ii].get_mag_at_frame(fr-1) for ii in pidx]
+            # sort partials per magnitude
             allpmagl, pidx = zip(*sorted(zip(pmag,pidx),reverse=True))
            
             allpidx = np.array(pidx)
@@ -635,7 +687,7 @@ class SinSum(object):
         
         
         
-            for fc,mc,pc in zip(fsrt,msrt,psrt):
+            for fc,mc,pc,rc in zip(fsrt,msrt,psrt,rsrt):
                 # select old partials 
                 pidx = allpidx[unused]
                 #print 'unused: %d, len: %d\n'%(sum(unused),len(pidx))
@@ -651,7 +703,7 @@ class SinSum(object):
                     # very rough formula for db:
                     dbdiff = dbconst*(pmag/mc-1)
             
-                    ovdiff = stonediff+abs(dbdiff)
+                    ovdiff = stonediff#+abs(dbdiff)
                     nearest = np.argmin(ovdiff)
                     #print 'Distance: %f'%(ovdiff[nearest])
             
@@ -659,8 +711,20 @@ class SinSum(object):
                         
                         idx = pidx[nearest]
                         part = self.partial[idx]
-                        unused[nearest]=False
+                        unuidx = np.nonzero(unused)[0]
+                        unused[unuidx[nearest]]=False
                     else:
+                        sys.stderr.write('New partial {} at frame {}: min semitone interval = {}\n'.format
+                                         (len(self.partial)+1,fr,stonediff[nearest]))
+                        sys.stderr.write('This frequency: {}\n'.format(fc))
+                        sys.stderr.write('Previous frame frequencies\n')
+                        for ff,uu in zip(allpf,unused):
+                            sys.stderr.write('{}'.format(ff))
+                            if uu:
+                                sys.stderr.write('\n')
+                            else:
+                                sys.stderr.write(' (used) \n')
+                                    
                         part = self.add_empty_partial(fr)
                         idx = -1
                 # if no more previous partials left (pidx is empty)
@@ -669,14 +733,14 @@ class SinSum(object):
                     part = self.add_empty_partial(fr)
                     idx = -1
     
-                part.append_point(fc,mc,pc)
+                part.append_point(fc,mc,pc,realph=rc)
                 self.end[idx] = fr
         else: 
-            for fc,mc,pc in zip(fsrt,msrt,psrt):
+            for fc,mc,pc,rc in zip(fsrt,msrt,psrt,rsrt):
                 part = self.add_empty_partial(fr)
                 idx = -1
                     
-                part.append_point(fc,mc,pc)
+                part.append_point(fc,mc,pc,realph=rc)
                 self.end[idx] = fr
                 
             

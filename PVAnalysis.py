@@ -185,6 +185,9 @@ class PV:
                 #mag.append(np.sqrt(pkf.calc_individual_area(ipk,funct=lambda x:x*x)))
                 
                 ph.append(thisph)
+                # phase correction for varying frequency
+                #phcor = np.pi*(fsam[-1] - fsam[0])/fstep/2.;
+                
                 
                 realph.append(thisph + np.pi * df/self.fstep)
             
@@ -451,7 +454,7 @@ class Partial(object):
         '''
         
 class RegPartial(object):
-    def __init__(self,istart,pdict=None):
+    def __init__(self,istart,pdict=None, overlap=0.5):
         '''
         A quasi-sinusoidal partial with homogeneous sampling
         Arguments: 
@@ -464,6 +467,7 @@ class RegPartial(object):
         '''
         
         self.start_idx = istart
+        self.overlap = overlap
         
         
         if pdict is None:
@@ -521,7 +525,7 @@ class RegPartial(object):
             return np.nan
 
         
-    def synth(self, sr, hop):
+    def synth_single_vect(self, sr, hop):
         '''
         Resynthesise the sinusoidal partial at sampling rate sr
         '''
@@ -576,9 +580,39 @@ class RegPartial(object):
         phcorfr=np.append(phcorfr,0.0)
         phcor = np.interp(t,tfr,phcorfr)
         
-        ph = ph + phcor
+        #ph = ph + phcor
         
         return mag * np.cos(ph), (self.start_idx)*hop
+        
+    def synth(self,sr,hop):
+        nfr = len(self.f)
+        # frame delay due to averaging and overlap
+        dfr = 1/self.overlap/2.
+        sig = np.zeros(hop*(nfr+1))
+        msig = np.interp(np.arange(hop*(nfr+1)),hop*(dfr+np.arange(nfr)),self.mag)
+        fsig = np.interp(np.arange(hop*(nfr+1)),hop*(dfr+.5+np.arange(nfr)),self.f)
+        for ii in xrange(nfr):
+            #fsam = self.f[ii]*np.ones(hop-1)
+            fsam = fsig[hop*ii:(hop*(ii+1)-1)]
+            #msam = np.interp(self.mag[ii]
+            ph = pi2 * np.cumsum(fsam/float(sr))
+            ph = np.insert(ph,0,0)
+            
+            
+            
+            # starting phase
+            ph0 = self.realph[ii] 
+            ph += ph0
+            
+            if ii<nfr-1:
+                # phase correction for discontinuities
+                phend = ph[-1] + fsig[hop*(ii+1)]/float(sr)
+                dph = np.mod(self.realph[ii+1] - phend+np.pi ,pi2)-np.pi 
+                #ph += np.linspace(0.0,dph,num=hop+1)[:-1]
+            
+            thissig = msig[hop*ii:hop*(ii+1)] * np.cos(ph)
+            sig[hop*ii:hop*(ii+1)] = thissig
+        return sig, (self.start_idx)*hop
         
 class SinSum(object):
     def __init__(self, sr, nfft=1024, hop=512):
@@ -607,7 +641,7 @@ class SinSum(object):
         Append an empty partial at frame idx 
         '''
         
-        newpart = RegPartial(idx)
+        newpart = RegPartial(idx,overlap = self.hop/float(self.nfft))
         self.partial.append(newpart)
         self.st.append(idx)
         self.end.append(idx)
@@ -714,16 +748,16 @@ class SinSum(object):
                         unuidx = np.nonzero(unused)[0]
                         unused[unuidx[nearest]]=False
                     else:
-                        sys.stderr.write('New partial {} at frame {}: min semitone interval = {}\n'.format
-                                         (len(self.partial)+1,fr,stonediff[nearest]))
-                        sys.stderr.write('This frequency: {}\n'.format(fc))
-                        sys.stderr.write('Previous frame frequencies\n')
-                        for ff,uu in zip(allpf,unused):
-                            sys.stderr.write('{}'.format(ff))
-                            if uu:
-                                sys.stderr.write('\n')
-                            else:
-                                sys.stderr.write(' (used) \n')
+                        #sys.stderr.write('New partial {} at frame {}: min semitone interval = {}\n'.format
+                        #                 (len(self.partial)+1,fr,stonediff[nearest]))
+                        #sys.stderr.write('This frequency: {}\n'.format(fc))
+                        #sys.stderr.write('Previous frame frequencies\n')
+                        # for ff,uu in zip(allpf,unused):
+                        #     sys.stderr.write('{}'.format(ff))
+                        #     if uu:
+                        #         sys.stderr.write('\n')
+                        #     else:
+                        #         sys.stderr.write(' (used) \n')
                                     
                         part = self.add_empty_partial(fr)
                         idx = -1

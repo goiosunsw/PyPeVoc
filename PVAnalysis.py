@@ -31,6 +31,11 @@ import sys
 
 from PeakFinder import PeakFinder as pf
 
+try:
+    from scipy.interpolate import interp1d 
+except ImportError:
+    sys.stderr.write('SciPy not found. Using linear interpolation\n')
+    
 """  
 Perform the Phase vocoder decomposition of a signal into 
 quasi-sinusoidal components
@@ -454,7 +459,7 @@ class Partial(object):
         '''
         
 class RegPartial(object):
-    def __init__(self,istart,pdict=None, overlap=0.5):
+    def __init__(self,istart,pdict=None, overlap=0.5, fstep=None):
         '''
         A quasi-sinusoidal partial with homogeneous sampling
         Arguments: 
@@ -468,6 +473,7 @@ class RegPartial(object):
         
         self.start_idx = istart
         self.overlap = overlap
+        self.fstep = fstep
         
         
         if pdict is None:
@@ -584,13 +590,25 @@ class RegPartial(object):
         
         return mag * np.cos(ph), (self.start_idx)*hop
         
-    def synth(self,sr,hop):
+    def synth(self,sr,hop, intermediate=False, edge=.5):
         nfr = len(self.f)
         # frame delay due to averaging and overlap
-        dfr = 1/self.overlap/2.
-        sig = np.zeros(hop*(nfr+1))
-        msig = np.interp(np.arange(hop*(nfr+1)),hop*(dfr+np.arange(nfr)),self.mag)
-        fsig = np.interp(np.arange(hop*(nfr+1)),hop*(dfr+.5+np.arange(nfr)),self.f)
+        dfr = 1./self.overlap/2.
+        sig = np.zeros(hop*(nfr))
+        newt=np.arange(hop*(nfr+dfr))
+        # try:
+        #     oldt = hop*np.arange(nfr+2*dfr)
+        #     mvals = np.append(np.append(self.mag[0]*np.ones(dfr),self.mag),self.mag[-1]*np.ones(dfr))
+        #     mfunc = interp1d(oldt-1.0,mvals,kind='cubic')
+        #     msig = mfunc(newt)
+        #
+        #     fvals = np.append(np.append(self.f[0]*np.ones(dfr),self.f),self.f[-1]*np.ones(dfr))
+        #     func = interp1d(hop*(-.5+oldt),fvals,
+        #                     kind='cubic')
+        #     fsig = func(newt)
+        # except NameError:
+        fsig = np.interp(newt,hop*(dfr+.5+np.arange(nfr)),self.f)
+        msig = np.interp(newt,hop*(dfr+np.arange(nfr)),self.mag)
         for ii in xrange(nfr):
             #fsam = self.f[ii]*np.ones(hop-1)
             fsam = fsig[hop*ii:(hop*(ii+1)-1)]
@@ -599,20 +617,51 @@ class RegPartial(object):
             ph = np.insert(ph,0,0)
             
             
-            
-            # starting phase
-            ph0 = self.realph[ii] 
+            # phase correction for variable frequency
+            if self.fstep is None:
+                phcor = 0.0
+                phcornext = 0.0
+            else:    
+                phcor = np.pi*(fsig[hop*(ii+1)] - fsig[hop*ii])/self.fstep/2.
+                if ii<nfr-1:
+                    phcornext = np.pi*(fsig[hop*(ii+2)] - fsig[hop*(ii+1)])/self.fstep/2.
+                    
+            # starting phase                
+            ph0 = self.realph[ii] + phcor 
             ph += ph0
+            
             
             if ii<nfr-1:
                 # phase correction for discontinuities
-                phend = ph[-1] + fsig[hop*(ii+1)]/float(sr)
-                dph = np.mod(self.realph[ii+1] - phend+np.pi ,pi2)-np.pi 
-                #ph += np.linspace(0.0,dph,num=hop+1)[:-1]
+                phend = ph[-1] + pi2*fsig[hop*(ii+1)]/float(sr)
+                dph = np.mod(self.realph[ii+1] + phcornext - phend+np.pi ,pi2)-np.pi 
+                ph += np.linspace(0.0,dph,num=hop+1)[:-1]
+            
+            #import pdb
+            #pdb.set_trace()
             
             thissig = msig[hop*ii:hop*(ii+1)] * np.cos(ph)
+            #phsig[hop*ii:hop*(ii+1)] = ph
             sig[hop*ii:hop*(ii+1)] = thissig
-        return sig, (self.start_idx)*hop
+            
+        # smoothen edges of partial
+        # beginning
+        edgsam=int(dfr*hop*edge)
+        #mag = np.linspace(0.0, self.mag[0], edgsam)
+        mag = msig[0]*(1-np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
+        phb = np.flipud(self.realph[0] - pi2*np.cumsum(self.f[0]*np.ones(edgsam)/float(sr)))
+        sig = np.insert(sig,0,mag*np.cos(phb))
+        #end
+        #mag = np.linspace( self.mag[-1],0.0, edgsam)
+        mag = msig[hop*(ii+1)]*(1+np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
+        phb = ph[-1] + pi2*np.cumsum(self.f[-1]*np.ones(edgsam)/float(sr))
+        sig = np.append(sig,mag*np.cos(phb))
+        
+            
+        if intermediate:
+            return sig, int((self.start_idx)*hop-edgsam), phsig
+        else:
+            return sig, int((self.start_idx)*hop-edgsam)
         
 class SinSum(object):
     def __init__(self, sr, nfft=1024, hop=512):
@@ -641,7 +690,8 @@ class SinSum(object):
         Append an empty partial at frame idx 
         '''
         
-        newpart = RegPartial(idx,overlap = self.hop/float(self.nfft))
+        newpart = RegPartial(idx,overlap = self.hop/float(self.nfft), 
+                                 fstep=self.sr/float(self.nfft))
         self.partial.append(newpart)
         self.st.append(idx)
         self.end.append(idx)
@@ -867,15 +917,21 @@ class SinSum(object):
         pl.ylabel('Frequency (Hz)')
         pl.show()
         
-    def synth(self,sr,hop):
+    def synth(self,sr,hop,edge=1.0,minframes=3):
+        # edges
+        dfr = self.nfft/self.hop/2.
+        edgsamp = edge*hop*dfr
+        
         # fixme: why +2??? 
-        w = np.zeros((max(self.end)+2)*hop)
+        w = np.zeros((max(self.end)+2)*hop+2*edgsamp)
         for part in self.partial:
-            wi, spl_st = part.synth(sr,hop)
-            if spl_st>=0:
-                spl_end = spl_st+len(wi)
-                w[spl_st:spl_end]+= wi
-        return w
+            if len(part.f)>=minframes:
+                wi, spl_st = part.synth(sr,hop,edge=edge)
+                spl_st+=edgsamp
+                if spl_st>=0:
+                    spl_end = spl_st+len(wi)
+                    w[spl_st:spl_end]+= wi
+        return w[edgsamp:]
         
     def get_avfreq(self):
         return np.array([np.mean(xx.f) for xx in self.partial])

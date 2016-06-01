@@ -17,7 +17,7 @@ sig = sig/ float(np.iinfo(sig.dtype).max)
 pl.figure()
 ss=pl.specgram(sig,NFFT=1024/2)
 
-mypv=pv.PV(sig,sr,nfft=1024,npks=15,hop=256)
+mypv=pv.PV(sig,sr,nfft=1024,npks=25,hop=256)
 mypv.run_pv()
 mypv.plot_time_freq()
 

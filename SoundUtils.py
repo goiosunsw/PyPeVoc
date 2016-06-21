@@ -100,6 +100,46 @@ def AvgWind(x, sr=1, nwind=1024, nhop=512, windfunc=np.blackman):
         iend = ist+nwind
         
     return np.array(amp), np.array(t)
+
+def SpecFlux(x, sr=1, nwind=1024, nhop=512, minf=0, maxf=np.inf, windfunc=np.blackman):
+    '''
+    Calculates the spectral flux in sunud
+    '''
+    
+    nsam = len(x)
+    # first window
+    ist = 0
+    iend = ist+nwind
+
+    t=[]
+    res=[]
+    
+    wind = windfunc(nwind)
+    wsum = sum(wind)
+    #wsum2= sum(wind*wind)
+    
+    minbin = int(minf/sr*nwind)
+    maxbinf = (float(maxf)/sr*nwind)
+    if maxbinf > nwind:
+        maxbin = nwind
+    else:
+        maxbin = int(maxbinf)
+    
+    while (iend < nsam-nhop):
+        thisx = x[ist:iend]
+        nextx = x[ist+nhop:iend+nhop]
+        
+        ff = np.abs(np.fft.fft(thisx*wind))
+        fl = np.abs(np.fft.fft(nextx*wind))
+        
+        res.append(np.sqrt(sum((ff[minbin:maxbin]-fl[minbin:maxbin])**2)))
+        t.append(float(ist+iend+nhop)/2.0/float(sr))
+        
+        ist = ist+nhop
+        iend = ist+nwind
+        
+    return np.array(res), np.array(t)
+
     
 def PlaySound(w,sr=44100):
     import pyaudio

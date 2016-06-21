@@ -531,28 +531,23 @@ class RegPartial(object):
             return np.nan
 
         
-    def synth_single_vect(self, sr, hop):
+    def synth_no_phase(self, sr, hop, edge=.5):
         '''
         Resynthesise the sinusoidal partial at sampling rate sr
         '''
         # frequency values are delayed by 1/2 frame
         fdel = -hop/float(sr)/2.
         
-        
-        # reference phase
-        iref  = np.argmax(self.mag)
-        phref = self.ph[iref]
-        #reference sample
-        sref = (iref+1)*hop
+        dfr = 1./self.overlap/2.
         
         # time corresponding to frames
-        tfr = (self.start_idx - 1 + np.arange(len(self.f)+2)) * float(hop)/sr
+        tfr = (self.start_idx + np.arange(len(self.f)+2*dfr)) * float(hop)/sr
         ffr = self.f
-        ffr=np.insert(ffr,0,ffr[0])
-        ffr=np.append(ffr,ffr[-1])
+        ffr=np.insert(ffr,0,ffr[0]*np.ones(dfr))
+        ffr=np.append(ffr,ffr[-1]*np.ones(dfr))
         mfr = self.mag
-        mfr=np.insert(mfr,0,0.0)
-        mfr=np.append(mfr,0.0)
+        mfr=np.insert(mfr,0,np.linspace(0,mfr[0],dfr+1)[:-1])
+        mfr=np.append(mfr,np.linspace(mfr[1],0,dfr+1)[1:])
         
         # start synth one frame before and one after to avoid dicontinuites
         tmin = min(tfr)-hop/sr
@@ -566,30 +561,10 @@ class RegPartial(object):
         ph = np.cumsum(2*np.pi*f/sr)
         
         
-        # phase correction to match original phase
-        phcorfr = np.zeros_like(self.ph)
-        
-        
-        for nfr, phor in enumerate(self.ph):
-            nsam = nfr*hop
-            phcorfr[nfr] = phor-np.mod(ph[nsam], 2*np.pi)
-            if phcorfr[nfr]-phcorfr[nfr-1]>np.pi:
-                phcorfr[nfr]-=2*np.pi
-            if phcorfr[nfr]-phcorfr[nfr-1]<-np.pi:
-                phcorfr[nfr]+=2*np.pi
-            # if phcorfr[nfr]>np.pi:
-            #     phcorfr[nfr]-=2*np.pi
-            # if phcorfr[nfr]<-np.pi:
-            #     phcorfr[nfr]+=2*np.pi
-            
-        phcorfr=np.insert(phcorfr,0,0.0)
-        phcorfr=np.append(phcorfr,0.0)
-        phcor = np.interp(t,tfr,phcorfr)
-        
-        #ph = ph + phcor
         
         return mag * np.cos(ph), (self.start_idx)*hop
         
+
     def synth(self,sr,hop, intermediate=False, edge=.5):
         nfr = len(self.f)
         # frame delay due to averaging and overlap
@@ -917,7 +892,7 @@ class SinSum(object):
         pl.ylabel('Frequency (Hz)')
         pl.show()
         
-    def synth(self,sr,hop,edge=1.0,minframes=3):
+    def synth(self,sr,hop,edge=1.0,minframes=3,phase_preserve=True):
         # edges
         dfr = self.nfft/self.hop/2.
         edgsamp = edge*hop*dfr
@@ -926,7 +901,10 @@ class SinSum(object):
         w = np.zeros((max(self.end)+2)*hop+2*edgsamp)
         for part in self.partial:
             if len(part.f)>=minframes:
-                wi, spl_st = part.synth(sr,hop,edge=edge)
+                if phase_preserve:
+                    wi, spl_st = part.synth(sr,hop,edge=edge)
+                else:
+                    wi, spl_st = part.synth_no_phase(sr,hop,edge=edge)
                 spl_st+=edgsamp
                 if spl_st>=0:
                     spl_end = spl_st+len(wi)

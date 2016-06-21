@@ -10,23 +10,32 @@ import PVAnalysis as pv
 #sr, sig =  wf.read('pepperCl.wav')
 #sr, sig =  wf.read('pepperSx.wav')
 #sr, sig =  wf.read('perlmanVn.wav')
-sr, sig =  wf.read('smirnoffVn.wav')
+#sr, sig =  wf.read('smirnoffVn.wav')
+#sr, sig =  wf.read('ProtectMarraigeInAmerica.wav')
+sr, sig =  wf.read('SoloGuitarArpegi.wav')
+
+# scale to floating point (range -1 to 1)
 sig = sig/ float(np.iinfo(sig.dtype).max)
     
 #pl.plot(sig)
 pl.figure()
 ss=pl.specgram(sig,NFFT=1024/2)
 
-mypv=pv.PV(sig,sr,nfft=1024,npks=25,hop=256)
+# Build the phase vocoder object
+mypv=pv.PV(sig,sr,nfft=1024*4,npks=25*4,hop=256*4)
+# Run the PV calculation
 mypv.run_pv()
+# plot the peaks that were found
 mypv.plot_time_freq()
 
+# convert to sinusoidal lines
 ss=mypv.toSinSum()
-#ss.plot_time_freq_mag(minlen=5)
 
+# resynthesise based on PV analysis
+# (reduce hop to slow down, increase to accelerate)
 w=ss.synth(sr,mypv.hop/1)
 
-#pl.hold(True)
+# plot original and resynthesis
 pl.figure()
 pl.plot(sig,label='orig')
 pl.hold(True)

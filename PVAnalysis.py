@@ -173,6 +173,7 @@ class PV:
         mag=[]
         ph=[]
         realph=[]
+        binno=[]
         
         # for each peak
         for ipk, nbin in enumerate(pk):
@@ -182,6 +183,7 @@ class PV:
             freq, df = self.dphase2freq(dph,nbin)
                 
             if freq > 0.0:
+                binno.append(nbin)
                 f.append(freq)
                 # amplitude
                 imin = max(nbin-wd,1)
@@ -197,7 +199,7 @@ class PV:
                 realph.append(thisph + np.pi * df/self.fstep)
             
         self.oldfft = fx
-        return f, mag, ph, realph
+        return f, mag, ph, realph, binno
         
     def run_pv(self):
         
@@ -205,6 +207,7 @@ class PV:
         allmag=[]
         allph=[]
         allrealph=[]
+        allbin=[]
         t=[]
         
         curpos = 0
@@ -214,18 +217,21 @@ class PV:
             mag = np.zeros(self.npeaks)
             ph = np.zeros(self.npeaks)
             realph = np.zeros(self.npeaks)
+            binno = np.zeros(self.npeaks)
             
-            ff, magf, phf, realf = self.calc_pv_frame(curpos)
+            ff, magf, phf, realf, binf = self.calc_pv_frame(curpos)
             
             f[0:len(ff)]=ff
             mag[0:len(magf)]=magf
             ph[0:len(phf)]=phf
             realph[0:len(realf)]=realf
+            binno[0:len(realf)]=binf
             
             allf.append(f)
             allmag.append(mag)
             allph.append(ph)
             allrealph.append(realph)
+            allbin.append(binno)
             
             t.append((curpos+self.nfft/2.0)/self.sr)
             
@@ -235,6 +241,7 @@ class PV:
         self.mag = np.array(allmag)
         self.ph = np.array(allph)
         self.realph = np.array(allrealph)
+        self.binno = np.array(allbin)
         #time values
         self.t = np.array(t)
         self.nframes = len(t)
@@ -281,7 +288,8 @@ class PV:
         if colors:
             cs=pl.colorbar()
             cs.set_label('Magnitude (dB)')
-        pl.show()
+        #pl.show()
+        return pl.gca()
 
     def plot_time_mag(self):
         import pylab as pl
@@ -296,7 +304,8 @@ class PV:
         pl.ylabel('Magnitude (dB)')
         cs=pl.colorbar()
         cs.set_label('Frequency (Hz)')
-        pl.show()
+        #pl.show()
+        return pl.gca()
         
     def get_time_vector(self):
         return self.t
@@ -637,6 +646,65 @@ class RegPartial(object):
             return sig, int((self.start_idx)*hop-edgsam), phsig
         else:
             return sig, int((self.start_idx)*hop-edgsam)
+     
+    def get_rel_phase(self,sr,hop):
+        nfr = len(self.f)
+        # frame delay due to averaging and overlap
+        dfr = 1./self.overlap/2.
+        newt = hop*(dfr+np.arange(nfr))
+        fsig = np.interp(newt,hop*(dfr+.5+np.arange(nfr)),self.f)
+        #msig = np.interp(newt,hop*(dfr+np.arange(nfr)),self.mag)
+        msig = self.mag
+        for ii in xrange(nfr):
+            ph = pi2 * np.cumsum(fsam/float(sr))
+            ph = np.insert(ph,0,0)
+            
+            # phase correction for variable frequency
+            if self.fstep is None:
+                phcor = 0.0
+                phcornext = 0.0
+            else:    
+                phcor = np.pi*(fsig[hop*(ii+1)] - fsig[hop*ii])/self.fstep/2.
+                if ii<nfr-1:
+                    phcornext = np.pi*(fsig[hop*(ii+2)] - fsig[hop*(ii+1)])/self.fstep/2.
+                    
+            # starting phase                
+            ph0 = self.realph[ii] + phcor 
+            ph += ph0
+            
+            
+            if ii<nfr-1:
+                # phase correction for discontinuities
+                phend = ph[-1] + pi2*fsig[hop*(ii+1)]/float(sr)
+                dph = np.mod(self.realph[ii+1] + phcornext - phend+np.pi ,pi2)-np.pi 
+                ph += np.linspace(0.0,dph,num=hop+1)[:-1]
+            
+            #import pdb
+            #pdb.set_trace()
+            
+            thissig = msig[hop*ii:hop*(ii+1)] * np.cos(ph)
+            #phsig[hop*ii:hop*(ii+1)] = ph
+            sig[hop*ii:hop*(ii+1)] = thissig
+            
+        # smoothen edges of partial
+        # beginning
+        edgsam=int(dfr*hop*edge)
+        #mag = np.linspace(0.0, self.mag[0], edgsam)
+        mag = msig[0]*(1-np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
+        phb = np.flipud(self.realph[0] - pi2*np.cumsum(self.f[0]*np.ones(edgsam)/float(sr)))
+        sig = np.insert(sig,0,mag*np.cos(phb))
+        #end
+        #mag = np.linspace( self.mag[-1],0.0, edgsam)
+        mag = msig[hop*(ii+1)]*(1+np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
+        phb = ph[-1] + pi2*np.cumsum(self.f[-1]*np.ones(edgsam)/float(sr))
+        sig = np.append(sig,mag*np.cos(phb))
+        
+            
+        if intermediate:
+            return sig, int((self.start_idx)*hop-edgsam), phsig
+        else:
+            return sig, int((self.start_idx)*hop-edgsam)
+     
         
 class SinSum(object):
     def __init__(self, sr, nfft=1024, hop=512):
@@ -854,7 +922,8 @@ class SinSum(object):
         pl.hold(False)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
-        pl.show()
+        #pl.show()
+        return pl.gca()
  
     def two_plot_time_freq_mag(self, minlen=10):
         part = [pp for pp in self.partial if len(pp.f)>minlen]
@@ -871,7 +940,8 @@ class SinSum(object):
         ax1.set_ylabel('Frequency (Hz)')
         ax2.set_xlabel('Time (s)')
         ax2.set_ylabel('Frequency (Hz)')
-        pl.show()
+        #pl.show()
+        return pl.gca()
     
     def plot_time_freq_mag(self, minlen=10, cm=pl.cm.rainbow):
         

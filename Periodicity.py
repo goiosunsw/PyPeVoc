@@ -231,7 +231,7 @@ class PeriodTimeSeries(object):
         self._calc_window_norm()
     
         self.nwind = len(window)
-        self.windad = amdf(window)
+        #self.windad = amdf(window)
         
         if hop is None:
             hop = round(self.nwind/2)
@@ -329,4 +329,12 @@ class PeriodTimeSeries(object):
             
             pl.scatter(per.time*np.ones(nc),per.cand_period,s=per.cand_strength*100,c=cols[0:nc],alpha=.5)
         
+    def get_f0(self):
+        """Get f0 as a function of time
+        """
         
+        f0 = np.zeros(len(self.periods))
+        for ii,per in enumerate(self.periods):
+            if len(per)>0:
+                f0[ii]=self.sr/min(per)
+        return f0

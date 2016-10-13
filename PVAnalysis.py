@@ -650,64 +650,44 @@ class RegPartial(object):
         else:
             return sig, int((self.start_idx)*hop-edgsam)
      
-    def get_rel_phase(self,sr,hop):
-        nfr = len(self.f)
+    def get_rel_phase(self):
+        nfr = len(self.mag)
         # frame delay due to averaging and overlap
         dfr = 1./self.overlap/2.
         newt = hop*(dfr+np.arange(nfr))
         fsig = np.interp(newt,hop*(dfr+.5+np.arange(nfr)),self.f)
+        thisph = np.zeros_like(self.ph)
         #msig = np.interp(newt,hop*(dfr+np.arange(nfr)),self.mag)
         msig = self.mag
-        for ii in xrange(nfr):
-            ph = pi2 * np.cumsum(fsam/float(sr))
-            ph = np.insert(ph,0,0)
+        for ii in xrange(nfr-1):
+            ph = 0.
             
             # phase correction for variable frequency
             if self.fstep is None:
                 phcor = 0.0
                 phcornext = 0.0
             else:    
-                phcor = np.pi*(fsig[hop*(ii+1)] - fsig[hop*ii])/self.fstep/2.
-                if ii<nfr-1:
-                    phcornext = np.pi*(fsig[hop*(ii+2)] - fsig[hop*(ii+1)])/self.fstep/2.
+                phcor = np.pi*(fsig[(ii+1)] - fsig[ii])/self.fstep/2.
+                if ii<nfr-2:
+                    phcornext = np.pi*(fsig[(ii+2)] - fsig[(ii+1)])/self.fstep/2.
                     
             # starting phase                
             ph0 = self.realph[ii] + phcor 
             ph += ph0
             
             
-            if ii<nfr-1:
-                # phase correction for discontinuities
-                phend = ph[-1] + pi2*fsig[hop*(ii+1)]/float(sr)
-                dph = np.mod(self.realph[ii+1] + phcornext - phend+np.pi ,pi2)-np.pi 
-                ph += np.linspace(0.0,dph,num=hop+1)[:-1]
+            #~ if ii<nfr-1:
+                #~ # phase correction for discontinuities
+                #~ phend = ph[-1] + pi2*fsig[hop*(ii+1)]/float(sr)
+                #~ dph = np.mod(self.realph[ii+1] + phcornext - phend+np.pi ,pi2)-np.pi 
+                #~ ph += np.linspace(0.0,dph,num=hop+1)[:-1]
             
             #import pdb
             #pdb.set_trace()
             
-            thissig = msig[hop*ii:hop*(ii+1)] * np.cos(ph)
-            #phsig[hop*ii:hop*(ii+1)] = ph
-            sig[hop*ii:hop*(ii+1)] = thissig
+            thisph[ii] = ph
             
-        # smoothen edges of partial
-        # beginning
-        edgsam=int(dfr*hop*edge)
-        #mag = np.linspace(0.0, self.mag[0], edgsam)
-        mag = msig[0]*(1-np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
-        phb = np.flipud(self.realph[0] - pi2*np.cumsum(self.f[0]*np.ones(edgsam)/float(sr)))
-        sig = np.insert(sig,0,mag*np.cos(phb))
-        #end
-        #mag = np.linspace( self.mag[-1],0.0, edgsam)
-        mag = msig[hop*(ii+1)]*(1+np.cos(np.pi*np.arange(edgsam)/float(edgsam)))/2.
-        phb = ph[-1] + pi2*np.cumsum(self.f[-1]*np.ones(edgsam)/float(sr))
-        sig = np.append(sig,mag*np.cos(phb))
-        
-            
-        if intermediate:
-            return sig, int((self.start_idx)*hop-edgsam), phsig
-        else:
-            return sig, int((self.start_idx)*hop-edgsam)
-     
+        return thisph
         
 class SinSum(object):
     def __init__(self, sr, nfft=1024, hop=512):

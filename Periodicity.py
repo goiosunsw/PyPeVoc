@@ -384,7 +384,9 @@ class PeriodTimeSeries(object):
         while idx < idxmax:
             self.per_at_index(idx)
             per_obj = self.periods[-1]
-            idx += per_obj.get_preferred_period() 
+            oldidx = idx
+            idx += per_obj.get_preferred_period()
+             
             sys.stdout.write("\b"*15+"%6d / %6d" % (idx,self.nx) )
             sys.stdout.flush()
 

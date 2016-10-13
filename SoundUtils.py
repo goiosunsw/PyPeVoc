@@ -48,7 +48,18 @@ def RMSWind(x, sr=1, nwind=1024, nhop=512, windfunc=np.blackman):
     amp, t = FuncWind(RMSvec,x,power=1,sr=sr,nwind=nwind,nhop=nhop)
     
     return np.sqrt(np.array(amp)), np.array(t)
+  
+def Heterodyn(x, f, sr=1, nwind=1024, nhop=512,windfunc=np.blackman):  
+    '''
+    Calculates the power near frequency f in x
     
+    nwind should be at least 3 periods if the signal is periodic.  
+    '''
+    sinsig = np.exp(2j*np.pi*np.arange(len(x))*f/float(sr))
+    hamp,t=FuncWind(np.sum, x*sinsig, power=1, sr=sr,nwind=nwind,nhop=nhop)
+    return np.array(hamp), np.array(t)
+
+
 def SpecCentWind(x, sr=1, nwind=1024, nhop=512, windfunc=np.blackman):
     '''
     Calculates the SpectralCentroid of x, in frames of
@@ -140,6 +151,33 @@ def SpecFlux(x, sr=1, nwind=1024, nhop=512, minf=0, maxf=np.inf, windfunc=np.bla
         
     return np.array(res), np.array(t)
 
+def aubio_f0yin(y,sr, nwind=1024, hop=512, method='yin', tolerance=None):
+    ''' Applies f0 detection to a numpy vector using aubio
+    '''
+    from aubio import pitch,fvec
+    
+    po = pitch(method, nwind, hop, sr)
+    vs = fvec(nwind)
+    
+    if tolerance is not None:
+        if tolerance>0.0 and tolerance < 1.0:
+            po.set_tolerance(tolerance)
+        else:
+            sys.stderr.write('Tolerance not set: Out of bounds\n')
+    
+    nsamples = y.shape[0]
+    
+    freq=[]
+    time=[]
+    conf=[]
+    
+    for ii in xrange(0,nsamples-nwind,hop):
+        thisy = y[ii:ii+nwind]
+        vs[:] = thisy
+        time.append(float(ii+nwind/2)/sr)
+        freq.append(po(vs))
+        conf.append(po.get_confidence())
+    return np.array(freq).squeeze(), np.array(time), np.array(conf)
     
 def PlaySound(w,sr=44100):
     import pyaudio

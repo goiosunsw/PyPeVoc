@@ -8,11 +8,11 @@ sys.path.append('..')
 import PVAnalysis as pv
 
 #sr, sig =  wf.read('pepperCl.wav')
-#sr, sig =  wf.read('pepperSx.wav')
+sr, sig =  wf.read('pepperSx.wav')
 #sr, sig =  wf.read('perlmanVn.wav')
 #sr, sig =  wf.read('smirnoffVn.wav')
 #sr, sig =  wf.read('ProtectMarraigeInAmerica.wav')
-sr, sig =  wf.read('SoloGuitarArpegi.wav')
+#sr, sig =  wf.read('SoloGuitarArpegi.wav')
 
 # scale to floating point (range -1 to 1)
 sig = sig/ float(np.iinfo(sig.dtype).max)
@@ -42,3 +42,11 @@ pl.hold(True)
 pl.plot(w,label='resynth')
 pl.legend()
 pl.show()
+
+fig,ax=pl.subplots(2,1,sharex=True)
+ax[0].plot(np.arange(len(sig))/float(sr),sig,label='orig')
+ax[0].hold(True)
+ax[0].plot(np.arange(len(w))/float(sr),w,label='resynth')
+ax[0].legend()
+mypv.plot_time_freq(ax=ax[1])
+

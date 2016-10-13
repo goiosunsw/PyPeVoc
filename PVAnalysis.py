@@ -270,26 +270,29 @@ class PV:
             ss.add_frame(fr,self.f[fr,:],self.mag[fr,:],self.ph[fr,:],realph=self.realph[fr,:])
         return ss
         
-    def plot_time_freq(self, colors=True):
+    def plot_time_freq(self, colors=True, ax = None):
         import pylab as pl
         
-        pl.figure()
+        if ax is None:
+            fig,allax=pl.subplots(1)
+            ax=allax
+                
         # make time matrix same shape as others
         t = np.outer(self.t,np.ones(self.npeaks))
         f = self.f
         if colors:
             mag = 20*np.log10(self.mag)
-            pl.scatter(t,f,s=6,c=mag,lw=0)
+            ax.scatter(t,f,s=6,c=mag,lw=0)
         else:
             mag = 100+20*np.log10(self.mag)
-            pl.scatter(t,f,s=mag,lw=0)
+            ax.scatter(t,f,s=mag,lw=0)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
-        if colors:
-            cs=pl.colorbar()
-            cs.set_label('Magnitude (dB)')
+        #if colors:
+            #cs=pl.colorbar(ax=ax)
+            #cs.set_label('Magnitude (dB)')
         #pl.show()
-        return pl.gca()
+        return ax
 
     def plot_time_mag(self):
         import pylab as pl

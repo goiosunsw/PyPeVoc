@@ -29,6 +29,32 @@ class testPeriodicity(unittest.TestCase):
         self.assertIsInstance(p0,float)
 
 
+class testPeriodMarks(unittest.TestCase):
+    def test_period_mark_corr_int_samples_per_period(self):
+        sr = 1.0
+        f0 = sr/8
+        nsam = 1024
+        x = gen_sin(f=f0, sr=sr, nsamp=nsam)
+        marks = period_marks_corr(x, sr=sr, tf=[0, nsam],
+                                  f=[f0, f0], window_size=256)
+        period = 1./f0
+        dmarks = np.diff(marks[1:])
+        for dm in dmarks:
+            self.assertAlmostEqual(dm, period)
+
+    def test_period_mark_corr_frac_samples_per_period(self):
+        sr = 1.0
+        f0 = sr/64.3
+        nsam = 1024
+        x = gen_sin(f=f0, sr=sr, nsamp=nsam)
+        marks = period_marks_corr(x, sr=sr, tf=[0, nsam],
+                                  f=[f0, f0], window_size=256)
+        period = 1./f0
+        dmarks = np.diff(marks[1:])
+        for dm in dmarks:
+            self.assertAlmostEqual(dm, period, places=1)
+
+
 def main():
     unittest.main()
 

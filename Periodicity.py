@@ -535,10 +535,10 @@ def period_marks_corr(x, sr=1.0, t0=0.0, tf=[], f=[], window_size=1024,
             # (at position window_size-1)
             peaks = pf.PeakFinder(xc)
             idx_min = np.argmin(np.abs(peaks.pos-window_size+1))
-            # delay_samp, _ = peaks.refine(idx_min)
-            delay_samp = peaks.get_pos()[idx_min]
+            delay_samp, _ = peaks.refine(idx_min)
+            # delay_samp = peaks.get_pos()[idx_min]
             delay_samp -= window_size-1
-            print delay_samp
+            # print delay_samp
             delay_t = (-delay_samp + period_samp)/sr
             if delay_t > min_per:
                 marks_t.append(next_t+(window_size+period_samp/2)/sr)
@@ -576,7 +576,10 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
     tx = np.arange(len(x))/(sr)
     # interpolate frequency values
     if tf is None:
-        assert(len(f) == len(x))
+        try:
+            assert(len(f) == len(x))
+        except(TypeError):
+            f = f*np.ones(len(x))
     else:
         # f_orig = f
         f = np.interp(tx, tf, f)
@@ -586,11 +589,12 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
     period_samp = int(sr/f[idx_0])
 
     marks = []
+    maxval = []
 
     # find the first minimum
     idx_start = idx_0 + np.argmin(x[idx_0:idx_0+period_samp])
-    while idx_start < len(x) - period_samp:
-        idx_end = idx_start + period_samp
+    while idx_start < len(x):
+        idx_end = np.min([idx_start + period_samp, len(x)])
         idx_max = np.argmax(x[idx_start:idx_end]) + idx_start
 
         if fit_points < 3:
@@ -599,24 +603,42 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
         #    # parabolic interpolation
         else:
             # parabolic fit
-            rel_idx_start = -fit_points/2
-            rel_idx_end = rel_idx_start + fit_points
+            rel_idx_start = np.max([0,-fit_points/2])
+            rel_idx_end = np.min([rel_idx_start + fit_points,
+                                 len(x) - idx_max - 1])
             # dx_fit = dx[idx_max+rel_idx_start:idx_max+rel_idx_end]
             # dx_abcissa = np.arange(rel_idx_start, rel_idx_end)+.5
             # fit_poly = np.polyfit(dx_abcissa, dx_fit, 1)
             # rel_refined_max = -fit_poly[1]/fit_poly[0]
             x_fit = x[idx_max+rel_idx_start:idx_max+rel_idx_end+1]
             x_abcissa = np.arange(rel_idx_start, rel_idx_end+1)
-            fit_poly = np.polyfit(x_abcissa, x_fit, 2)
-            rel_refined_max = -fit_poly[1]/fit_poly[0]/2
-            t_max = (idx_max + rel_refined_max)/sr
+            try:
+                fit_poly = np.polyfit(x_abcissa, x_fit, 2)
+                rel_refined_max = -fit_poly[1]/fit_poly[0]/2
+            except ValueError:
+                rel_refined_max = fit_points+1
+            if np.abs(rel_refined_max) <= fit_points:
+                t_max = (idx_max + rel_refined_max)/sr
+                v_max = np.polyval(fit_poly, rel_refined_max)
+            else:
+                t_max = (idx_max)/sr
+                v_max = x[idx_max]
 
         # prepare for next iteration 
         this_f0 = f[idx_max]
         if np.isfinite(this_f0):
             period_samp = int(sr/this_f0)
             marks.append(t_max)
+            maxval.append(v_max)
+
         # otherwise keep the same period
         # next starting point
-        idx_start = idx_max + np.argmin(x[idx_max:idx_max+period_samp])
-    return np.array(marks)
+        min_search_max = np.min([idx_max+period_samp, len(x)])
+        adv = np.argmin(x[idx_max:min_search_max])
+        if adv > 0:
+            idx_start = idx_max + adv
+        else:
+            idx_start = idx_max + 1
+        
+    return np.array(marks)[:-1], np.array(maxval)[:-1]
+

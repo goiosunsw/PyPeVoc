@@ -84,9 +84,9 @@ class PV:
         self.nsamp = len(self.x)
         self.sr = sr
         self.nfft = nfft
-        self.nfft2 = nfft/2
+        self.nfft2 = int(nfft/2)
         if hop is None:
-            self.hop = self.nfft/2
+            self.hop = int(self.nfft/2)
         else:
             self.hop = hop
         self.peakthresh = pkthresh

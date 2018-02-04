@@ -161,7 +161,7 @@ class Periodicity(object):
                 # pkstr = pkstr[keep]
 
         except IndexError as e:
-            print e
+            print(e)
 
         if len(pkpos) > 0:
             self.cand_period = pkpos

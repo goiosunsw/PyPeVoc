@@ -29,10 +29,11 @@
 
 import sys
 import numpy as np
-import PeakFinder as pf
 import pylab as pl
 from matplotlib.colors import hsv_to_rgb
-
+from .PeakFinder import PeakFinder as pf
+from .ProgressDisplay import Progress
+#from AMDF import amdf
 
 def amdf(x, mindelay=0, maxdelay=None):
     nx = len(x)
@@ -147,7 +148,7 @@ class Periodicity(object):
             if len(xcpos) > 0 and max(xcpos) > self.vthresh:
                 # this is equivlent to finding minima
                 # below the absolute minimum * threshold
-                peaks = pf.PeakFinder(xcpos, minval=xcth,
+                peaks = pf(xcpos, minval=xcth,
                                       npeaks=self.ncand)
 
                 peaks.refine_all()
@@ -169,7 +170,7 @@ class Periodicity(object):
 
             if self.cand_method == 'fft':
                 xf = np.fft.fft(xw)
-                fftpeaks = pf.PeakFinder(np.abs(xf[0:self.nwind/2]),
+                fftpeaks = pf(np.abs(xf[0:int(self.nwind/2)]),
                                          npeaks=self.ncand)
                 # periodicity corresponding to fft peaks:
                 fpos = fftpeaks.get_pos()
@@ -308,7 +309,7 @@ class PeriodSeries(object):
 
         self.mindelay = mindelay
         if maxdelay is None:
-            self.maxdelay = round(self.nwind/2)
+            self.maxdelay = int(round(self.nwind/2))
         else:
             self.maxdelay = maxdelay
 
@@ -326,6 +327,9 @@ class PeriodSeries(object):
 
         # data storage
         self.periods = []
+
+        # progress indicator
+        self.progress = Progress(end=self.nx)
 
     def _calc_window_norm(self):
         """Calculate the normalisation function for window
@@ -352,7 +356,8 @@ class PeriodSeries(object):
         pp.set_time_properties(index)
         pp.sort_strength()
 
-        self.periods.append(pp)
+        # self.periods.append(pp)
+        return pp
 
     def calc(self, hop=None, threshold=None):
         """Estimate local periodicity in the full time series
@@ -387,7 +392,8 @@ class PeriodSeries(object):
         if threshold is not None:
             self.threshold = oldthresh
 
-    def calcPeriodByPeriod(self, threshold=None):
+    def calcPeriodByPeriod(self, threshold=None, 
+                           tf=None, f=None):
         """Estimate local periodicity in the full time series
 
         Arguments:
@@ -408,18 +414,29 @@ class PeriodSeries(object):
         sys.stdout.write("Calculating local periodicity... ")
         idx = self.nwind
         while idx < idxmax:
-            self.per_at_index(idx)
-            per_obj = self.periods[-1]
+            pp = self.per_at_index(idx)
             oldidx = idx
-            di = per_obj.get_preferred_period()
+            if f is None:
+                di = pp.get_preferred_period()
+            else: 
+                thisf = np.interp(pp.time, tf, f)
+                if len(pp.cand_period)>0 and thisf>0:
+                    imin = np.argmin(np.abs(self.sr/thisf-pp.cand_period))
+                    pp.preferred = imin
+                    di = pp.cand_period[imin]
+                else:
+                    di=0
             if di:
                 idx += di
+                self.periods.append(pp)
             else:
-                idx += 1
+                idx += self.mindelay 
 
-            sys.stdout.write("\b"*15+"%6d / %6d" % (idx, self.nx))
-            sys.stdout.flush()
+            # sys.stdout.write("\b"*15+"%6d / %6d" % (idx, self.nx))
+            # sys.stdout.flush()
+            self.progress.update(idx)
 
+        self.progress.update(self.nx)
         sys.stdout.write("\ndone\n") 
 
         if threshold is not None:
@@ -504,6 +521,53 @@ class PeriodByPeriod(PeriodSeries):
         self.t = pts.t
         self.sr = pts.sr
 
+def period_marks_amdf(x, sr=1.0, t0=0.0, tf=[], f=[], window_size=1024,
+                      min_per=0.001):
+    """add period marks information to file,
+    based on sample per sample difference between adjacent periods
+
+    :t0: first mark position
+    :window_size: window to use for comparison between periods
+    :returns: TODO
+
+    """
+    marks_t = [t0]
+    next_t = t0
+    this_f0 = np.interp(marks_t[-1], tf, f)
+    if np.isnan(this_f0):
+        this_f0 = np.nanmean(f)
+    period_samp = int(sr/this_f0)
+    while next_t*sr < len(x) - period_samp - window_size:
+        if not np.isnan(this_f0):
+            period_samp = int(sr/this_f0)
+            source_idx_st = int(next_t*sr)
+            target_idx_st = source_idx_st + period_samp
+            source_idx_end = source_idx_st + window_size
+            target_idx_end = target_idx_st + window_size
+            x_source = x[source_idx_st:source_idx_end]
+            x_target = x[target_idx_st:target_idx_end]
+            xc = amdf(x_source, x_target)
+            # find max of xc near 0 lag
+            # (at position window_size-1)
+            peaks = pf(-xc)
+            idx_min = np.argmin(np.abs(peaks.pos-window_size+1))
+            delay_samp, _ = peaks.refine(idx_min)
+            # delay_samp = peaks.get_pos()[idx_min]
+            delay_samp -= window_size-1
+            # print delay_samp
+            delay_t = (-delay_samp + period_samp)/sr
+            if delay_t > min_per:
+                marks_t.append(next_t+(window_size+period_samp/2)/sr)
+                next_t += delay_t
+            else:
+                next_t += 1/this_f0
+
+        else:
+            next_t = next_t + delay_t
+
+        this_f0 = np.interp(next_t, tf, f)
+    return np.array(marks_t)
+
 
 def period_marks_corr(x, sr=1.0, t0=0.0, tf=[], f=[], window_size=1024,
                       min_per=0.001):
@@ -533,7 +597,7 @@ def period_marks_corr(x, sr=1.0, t0=0.0, tf=[], f=[], window_size=1024,
             xc = np.correlate(x_source, x_target, "full")
             # find max of xc near 0 lag
             # (at position window_size-1)
-            peaks = pf.PeakFinder(xc)
+            peaks = pf(xc)
             idx_min = np.argmin(np.abs(peaks.pos-window_size+1))
             delay_samp, _ = peaks.refine(idx_min)
             # delay_samp = peaks.get_pos()[idx_min]
@@ -603,7 +667,7 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
         #    # parabolic interpolation
         else:
             # parabolic fit
-            rel_idx_start = np.max([0,-fit_points/2])
+            rel_idx_start = int(np.max([0,-fit_points/2]))
             rel_idx_end = np.min([rel_idx_start + fit_points,
                                  len(x) - idx_max - 1])
             # dx_fit = dx[idx_max+rel_idx_start:idx_max+rel_idx_end]

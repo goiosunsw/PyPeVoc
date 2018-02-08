@@ -29,7 +29,8 @@ import numpy as np
 import pylab as pl
 import sys
 
-from PeakFinder import PeakFinder as pf
+from .PeakFinder import PeakFinder as pf
+from .ProgressDisplay import Progress
 
 try:
     from scipy.interpolate import interp1d
@@ -124,6 +125,7 @@ class PV:
         self.f = []
         self.ph = []
         self.mag = []
+        self.progress = Progress(end=self.nsamp)
 
     def dphase2freq(self, dph, nbin):
         '''
@@ -239,6 +241,9 @@ class PV:
             t.append((curpos + self.nfft/2.0)/self.sr)
 
             curpos += self.hop
+            self.progress.update(curpos)
+
+        self.progress.update(self.nsamp)
 
         self.f = np.array(allf)
         self.mag = np.array(allmag)

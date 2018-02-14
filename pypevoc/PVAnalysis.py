@@ -359,6 +359,47 @@ class PV:
     def get_sample_vector(self):
         return (self.t*self.sr).astype('int')
 
+    def calc_f0(self, fmin=50, fmax=10000, thr=0.1):
+        """
+        Determine fundamental components in periodic tones
+        and return their freuqnecy
+        """
+        fm = np.zeros(self.f.shape[0])
+        im = np.zeros(self.f.shape[0],dtype='i')
+        for ii in range(len(fm)):
+            ff = self.f[ii,:]
+            mm = self.mag[ii,:]
+            maxmag = np.max(mm)
+            in0 = np.flatnonzero(np.all((ff>fmin,ff<fmax,mm>maxmag*thr),axis=0))
+            if len(in0)>0:
+                fn0 = ff[in0]
+                #isel = np.argmax(mm[in0])
+                isel = np.argmin(ff[in0])
+                fm[ii] = fn0[isel]
+                im[ii] = in0[isel]
+
+        self.fundamental_idx = im
+        return fm
+
+    @property
+    def fundamental_frequency(self):
+        try:
+            return self.f[np.arange(self.f.shape[0]),
+                          self.fundamental_idx]
+        except AttributeError:
+            return self.calc_f0()
+
+    @property
+    def fundamental_magnitude(self):
+        try:
+            return self.mag[np.arange(self.f.shape[0]),
+                            self.fundamental_idx]
+        except AttributeError:
+            self.calc_f0()
+            return self.mag[np.arange(self.f.shape[0]),
+                            self.fundamental_idx]
+
+
 
 class PVHarmonic(PV):
     def __init__(self, *args, **kwargs):
@@ -401,10 +442,11 @@ class PVHarmonic(PV):
         f = []
         mag = []
         ph = []
+        cummagsq = 0
 
         # for each f0 multiple
         f0bin = f0/self.sr*self.nfft
-        bins = np.round(np.arange(f0bin, self.nfft2 - 1, f0bin))
+        bins = np.round(np.arange(f0bin, self.nfft2 - 1, f0bin)).astype('int')
         for ipk, nbin in enumerate(bins):
             if ipk > 0:
                 if f[0] > self.fmin:
@@ -423,20 +465,23 @@ class PVHarmonic(PV):
             # amplitude
             imin = max(nbin - wd, 1)
             imax = min(nbin + wd, len(famp))
-            mag.append(np.sqrt(sum(famp[imin:imax+1]**2)))
+            thismagsq = (sum(famp[imin:imax+1]**2))
+            cummagsq += thismagsq
+            mag.append(np.sqrt(thismagsq))
             # mag.append(np.sqrt(pkf.calc_individual_area(ipk,
             # funct=lambda x:x*x)))
 
             ph.append(thisph)
-
+        residual = np.sqrt(np.sum(famp**2)-cummagsq)
         self.oldfft = fx
-        return f, mag, ph
+        return f, mag, ph, residual
 
     def run_pv(self):
 
         allf = []
         allmag = []
         allph = []
+        allres = []
         t = []
 
         curpos = 0
@@ -445,27 +490,33 @@ class PVHarmonic(PV):
             f = np.zeros(self.npeaks)
             mag = np.zeros(self.npeaks)
             ph = np.zeros(self.npeaks)
+            thisf = self.f0[int((curpos)/self.hop)]
 
-            ff, magf, phf = self.calc_pv_frame(curpos,
-                                               self.f0[int((curpos)/self.hop)])
+            if thisf>0 and ~np.isnan(thisf):
+                ff, magf, phf, residual = self.calc_pv_frame(curpos, thisf)
 
-            nh = min(len(ff), len(f))
+                nh = min(len(ff), len(f))
 
-            f[0:nh] = ff[0:nh]
-            mag[0:nh] = magf[0:nh]
-            ph[0:nh] = phf[0:nh]
+                f[0:nh] = ff[0:nh]
+                mag[0:nh] = magf[0:nh]
+                ph[0:nh] = phf[0:nh]
 
             allf.append(f)
             allmag.append(mag)
             allph.append(ph)
+            allres.append(residual)
 
             t.append((curpos + self.nfft/2.0)/self.sr)
 
             curpos += self.hop
+            self.progress.update(curpos)
+
+        self.progress.update(self.nsamp)
 
         self.f = np.array(allf)
         self.mag = np.array(allmag)
         self.ph = np.array(allph)
+        self.residuals = np.array(allres)
         # time values
         self.t = np.array(t)
         self.nframes = len(t)

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from Periodicity import period_marks_corr, PeriodTimeSeries
+from pypevoc.Periodicity import period_marks_corr, PeriodTimeSeries
 
 
 def gen_sin(f=440, sr=48000, nsamp=4800):
@@ -16,8 +16,7 @@ class testPeriodicity(unittest.TestCase):
         nsam = 4800
         x = gen_sin(f=f0, sr=sr, nsamp=nsam)
         pts = PeriodTimeSeries(x, sr=sr, method='xcorr')
-        pts.per_at_index(nsam/2)
-        period = pts.periods[0]
+        period = pts.per_at_index(nsam/2)
         p0 = period.get_preferred_period()
         self.assertAlmostEqual(sr/p0, f0, delta=1.0)
 
@@ -25,8 +24,7 @@ class testPeriodicity(unittest.TestCase):
         x = gen_sin()
         nsam = len(x)
         pts = PeriodTimeSeries(x, method='xcorr')
-        pts.per_at_index(nsam/2)
-        period = pts.periods[0]
+        period = pts.per_at_index(nsam/2)
         p0 = period.get_preferred_period()
         self.assertIsInstance(p0, float)
 

@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 import scipy.signal as sig
+import scipy.linalg as lg
 from scipy.io import wavfile
 from .. import FFTFilters as ftf
 try:
@@ -8,6 +9,21 @@ try:
 except ImportError:
     sys.stderr.write('scikits.talkbox package not installed.\n Formant analysis will not be available\n')
     
+
+def lpc(w, order, axis=-1):
+    """
+    Calculate the lpc coefficients of the waveform
+    """
+    
+    nsamp = w.shape[axis]
+    if order > nsamp:
+        raise ValueError('Order must be smaller than size of vector')
+
+    r = np.correlate(w, w, 'full')
+    use_r = r[nsamp-1:nsamp+order]
+    a = lg.solve_toeplitz(use_ri[:-1], use_r[1:])
+
+    return a
 
 def refine_max(x, pos):
     '''

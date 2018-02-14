@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import scipy.signal as sig
 from scipy.io import wavfile
-import FFTFilters as ftf
+from .. import FFTFilters as ftf
 try:
     import scikits.talkbox as tbx
 except ImportError:

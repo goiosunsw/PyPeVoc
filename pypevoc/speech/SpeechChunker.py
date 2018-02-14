@@ -27,7 +27,7 @@ import os
 
 import numpy as np
 
-from SpeechAnalysis import rmsWind
+from .SpeechAnalysis import rmsWind
 
 try:
     from scipy.io.wavfile import read as wavread

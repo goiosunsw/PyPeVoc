@@ -25,9 +25,9 @@
 import sys
 
 import numpy as np
-import SpeechAnalysis as sa
-import FFTFilters as ff
-import Peaks as pkf
+from . import SpeechAnalysis as sa
+from .. import FFTFilters as ff
+from .. import PeakFinder as pkf
 
 def peaks(x):
     '''
@@ -275,7 +275,7 @@ class SpeechSegmenter(object):
         ibef = np.flatnonzero(np.logical_and(tfine>tseg-intbef,tfine<tseg))
         iaft = np.flatnonzero(np.logical_and(tfine>tseg,tfine<tseg+intbef))
         iall = np.flatnonzero(np.logical_and(tfine>tseg-intbef,tfine<tseg+intbef))
-        print 'Rough peak at: {}'.format(tseg)
+        print('Rough peak at: {}'.format(tseg))
         bandpk = []
         bandweight = []
 
@@ -295,7 +295,8 @@ class SpeechSegmenter(object):
                 pkfine = tseg
             bandpk.append(pkfine)
             bandweight.append(np.abs(valb-vala))
-            print 'Band {} transition at: {} (from {} to {})'.format(ibd,pkfine,valb,vala)
+            print('Band {} transition at: {} (from {} to {})'.format(
+                ibd,pkfine,valb,vala))
             #ax[1].axvline(pkfine,ls='-',color=colors[ibd],alpha=.7)
         return np.sum(np.array(bandpk)*np.array(bandweight))/np.sum(bandweight)
 
@@ -650,7 +651,7 @@ def main(args):
     
     if args.stdout:
         for tt in tsegr:
-            print tt 
+            print(tt)
     
     return 0
 

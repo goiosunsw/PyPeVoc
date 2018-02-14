@@ -23,7 +23,6 @@
 #  
 
 import numpy as np
-import SpeechAnalysis as sa
 
 class BandError(Exception):
     """Exception raised for errors in band definition.

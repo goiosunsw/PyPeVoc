@@ -8,6 +8,6 @@ setup(name='pypevoc',
       author='Andre Goios',
       author_email='a.almeida@unsw.edu.au',
       license='GPL v3',
-      packages=['pypevoc'],
+      packages=['pypevoc', 'pypevoc.speech'],
       zip_safe=False)
 

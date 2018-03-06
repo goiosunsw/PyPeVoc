@@ -615,7 +615,7 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
             try:
                 fit_poly = np.polyfit(x_abcissa, x_fit, 2)
                 rel_refined_max = -fit_poly[1]/fit_poly[0]/2
-            except ValueError:
+            except (ValueError, np.RankWarning):
                 rel_refined_max = fit_points+1
             if np.abs(rel_refined_max) <= fit_points:
                 t_max = (idx_max + rel_refined_max)/sr

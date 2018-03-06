@@ -4,11 +4,6 @@ import scipy.signal as sig
 import scipy.linalg as lg
 from scipy.io import wavfile
 from .. import FFTFilters as ftf
-try:
-    import scikits.talkbox as tbx
-except ImportError:
-    sys.stderr.write('scikits.talkbox package not installed.\n Formant analysis will not be available\n')
-    
 
 def lpc(w, order, axis=-1):
     """
@@ -20,8 +15,10 @@ def lpc(w, order, axis=-1):
         raise ValueError('Order must be smaller than size of vector')
 
     r = np.correlate(w, w, 'full')
+    #use_r = np.zeros(order+1)
+    #use_r[:order+1] = r[nsamp-1:nsamp+order]
     use_r = r[nsamp-1:nsamp+order]
-    a = lg.solve_toeplitz(use_ri[:-1], use_r[1:])
+    a = lg.solve_toeplitz(use_r[:-1], -use_r[1:])
 
     return a
 
@@ -215,7 +212,7 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
     # resample the original wave file
     # AnalysisFs = 8000;
     
-    underSample = Fs/fMax/2;
+    underSample = int(Fs/fMax/2);
     FsO = Fs;
     
     # Fourier method: can be slow!
@@ -236,7 +233,8 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
     dt = 1./Fs;
     nFrames = int(np.floor((wLen-windowLenSam-1)/hopLenSam))
     
-    Form = np.nan*np.ones((nFrames,modelOrd/2));
+    Form = np.nan*np.ones((nFrames,int(modelOrd/2)));
+    BandWidths = np.nan*np.ones((nFrames,int(modelOrd/2)));
     Time = np.arange(nFrames+0)*hopLenSam/Fsf+windowLenSam/Fsf/2
     
     
@@ -255,9 +253,10 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
         #XW = filter(1,PreEmph,XW);
         
         # call LPC 
-        A, err, rcoeff = tbx.lpc(XW,modelOrd);
-        #A = arburg(XW,modelOrd);
-        RTS = np.roots(A);
+        # A, err, rcoeff = lpc(XW,modelOrd);
+        A = lpc(XW,modelOrd);
+        #RTS = np.roots(A)
+        RTS = np.roots(np.concatenate(([1],A)));
         
         # roots are complex conjugate pairs
         RTS = RTS[np.imag(RTS)>=0];
@@ -269,17 +268,18 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
         FreqS = nFreq[Indices]
         FreqS = FreqS[FreqS>0]
         # Bandwidths are the distance to the unit circle
-        BW = -1/2*(Fsf/(2*np.pi))*np.log(np.abs(RTS[Indices]));
-        
-        NN = 0;
+        BW = -1/2*(Fsf/(2*np.pi))*np.log(np.abs(RTS[Indices]))
+
+        NN = 0
         for KK in range(len(FreqS)):
             if (FreqS[KK] > fMin and FreqS[KK] < fMax-fMin and BW[KK] <bwMax):
-                Form[FN,NN] = FreqS[KK];
-                NN = NN+1;
+                Form[FN, NN] = FreqS[KK]
+                BandWidths[FN, NN] = BW[KK]
+                NN = NN + 1
             else:
                 #print('Rejected f={}, bw={}'.format(FreqS[KK],BW[KK]))
                 pass
-    return Form, Time
+    return Time, Form, BandWidths
     
 def rmsWind(w, nwind=256, nhop=None, windfunc=np.ones, sr=1):
     '''

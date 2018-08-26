@@ -257,7 +257,7 @@ class FilterBank(object):
         if nhop:
             self.hop = nhop
         else:
-            self.hop = nwind/2
+            self.hop = int(nwind/2)
 
         self.fvec = np.linspace(0.,sr,nwind)
         if not fspec_list:

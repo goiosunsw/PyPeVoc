@@ -253,7 +253,7 @@ class FilterBank(object):
         '''
         self.sr = sr
         self.wind  = windfunc(nwind)
-        self.nwind = nwind
+        self.nwind = int(nwind)
         if nhop:
             self.hop = nhop
         else:

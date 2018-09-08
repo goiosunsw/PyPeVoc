@@ -104,10 +104,10 @@ def SpectralMoments(w, Fs, tWind=0.025, tHop=0.0125,
     hopLenSam = int(np.round(Fs*tHop));
     windowLenSam = int(np.round(Fs*tWind));
     #print 'SpectralMoments: Fs={}; wLen={}; hop={}'.format(Fs,windowLenSam,hopLenSam)
-    specLen = windowLenSam/2
+    specLen = int(windowLenSam/2)
     
     dt = 1./Fs
-    nFrames = (wLen - windowLenSam-1)/hopLenSam
+    nFrames = int((wLen - windowLenSam-1)/hopLenSam)
     
     wind = windFunc(windowLenSam)
     SxxSum = np.zeros(specLen)

@@ -16,7 +16,7 @@ Sine-wave decomposition allows a wide-range of analysis and resynthesis techniqu
 
 ```python
 import numpy as np
-import PVanalysis as pv
+from pypevoc import PV
 ```
 
 ### Create a periodic sound
@@ -47,10 +47,10 @@ dur = 1.0
 sig = np.zeros(int(sr*dur)) + 0.01*(np.random.rand(int(sr*dur))-.5)
 
 # time vector
-t = np.arange(0,dur,1./sr)
+t = np.arange(0, dur, 1./sr)
 
 # vectors for varying properties of the sound 
-hvibsig = np.zeros((int(sr*dur),len(hamp0)))
+hvibsig = np.zeros((int(sr*dur), len(hamp0)))
 vibsig = np.sin(2*np.pi*vibfreq*t)
 
 f0sig = f0 * (1 + f0vib*vibsig)
@@ -59,7 +59,7 @@ for n,ha in enumerate(hamp0):
     hno = n+1
     fsig = f0sig*hno
     phsig = np.cumsum(2*np.pi*fsig/sr)
-    hvibsig[:,n] = ha * (1+hvib[n]*np.sin(2*np.pi*vibfreq*t+hph[n]))
+    hvibsig[:,n] = ha * (1 + hvib[n]*np.sin(2*np.pi*vibfreq*t+hph[n]))
     sig += (hvibsig[:,n]) * np.sin(phsig)
 
 ```
@@ -68,7 +68,7 @@ for n,ha in enumerate(hamp0):
 
 ``` python
 # creates a Phase vocoder object
-mypv=pv.PV(sig,sr,nfft=2048,npks=len(hamp0))
+mypv = PV(sig, sr, nfft=2048, npks=len(hamp0))
 
 # run the analysis
 mypv.run_pv()

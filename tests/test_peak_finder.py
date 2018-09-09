@@ -1,6 +1,6 @@
 import numpy as np
 import sys
-import PeakFinder as pf
+import pypevoc.PeakFinder as pf
 
 import unittest
 

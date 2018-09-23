@@ -23,6 +23,8 @@
 
 import numpy as np
 import scipy.signal as sig
+import logging
+
 from .SpeechAnalysis import lpc
 
 
@@ -123,6 +125,7 @@ class InverseFilter:
         # calculate filter coefficients for preliminary hp filter
         if order is None:
             order = int(np.round(300/16000*self.Fs))
+        logging.info('Preliminary high-pass filter order set to %d'%order)
         self.hpfilt_b = sig.firls(order,
                                   [0, freq_stop, freq_pass, self.Fs/2],
                                   [0, 0, 1, 1],
@@ -143,7 +146,11 @@ class InverseFilter:
         # (independent of preliminary hp filter)
         # - Combined effect of lip radiation and glottal flow
 
-        assert len(x) > self.tract_order
+        try:
+            assert len(x) > self.tract_order
+        except AssertionError:
+            logging.warning('Frame not analysed')
+            return
 
         y = self.pre_phase_ramp(x)
         y = self.glottal_first_estimate(y)

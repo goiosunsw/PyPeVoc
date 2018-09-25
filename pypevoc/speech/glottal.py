@@ -63,11 +63,11 @@ class PaddedFilter(object):
             return self._padded_output[self.n_before:]
 
     def apply_fir(self, b):
-        self._padded_output = sig.lfilter(b, [1], self._padded_input)
+        self._padded_output = sig.lfilter(b, np.array([1]), self._padded_input)
         return self.output_signal
 
     def apply_fir_to_last_output(self, b):
-        self._padded_output = sig.lfilter(b, [1], self._padded_output)
+        self._padded_output = sig.lfilter(b, np.array([1]), self._padded_output)
         return self.output_signal
 
 

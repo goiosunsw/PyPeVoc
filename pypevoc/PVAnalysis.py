@@ -491,6 +491,7 @@ class PVHarmonic(PV):
             mag = np.zeros(self.npeaks)
             ph = np.zeros(self.npeaks)
             thisf = self.f0[int((curpos)/self.hop)]
+            residual = 0.0
 
             if thisf>0 and ~np.isnan(thisf):
                 ff, magf, phf, residual = self.calc_pv_frame(curpos, thisf)

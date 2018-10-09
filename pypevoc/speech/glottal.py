@@ -66,15 +66,15 @@ def iaif_ola(x, Fs=1, nwind=None, nhop=None,
         dglot[ist:ist+nwind] += gd*wind
         wins[ist:ist+nwind] += wind
 
-        vt_coeff.append(vt_f)
-        glot_coeff.append(g_f)
+        vt_coef.append(vt_f)
+        glot_coef.append(g_f)
         ist += nhop
 
     idx = wins>0
     glot[idx] /= wins[idx]
     dglot[idx] /= wins[idx]
     
-    return glot, dglot, np.array(vt_coeff), np.array(glot_coeff)
+    return glot, dglot, np.array(vt_coef), np.array(glot_coef)
 
 class PaddedFilter(object):
     def __init__(self, input_signal,

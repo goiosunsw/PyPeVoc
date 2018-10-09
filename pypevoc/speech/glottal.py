@@ -27,6 +27,54 @@ import logging
 
 from .SpeechAnalysis import lpc
 
+def iaif_ola(x, Fs=1, nwind=None, nhop=None, 
+             tract_order=None, glottal_order=None,
+             leaky_integration=0.99, wind_func=np.hanning):
+    
+    if nwind is None:
+        nwind = int(np.round(25/1000*Fs))
+    if nhop is None:
+        nhop = int(nwind/5)
+    if tract_order is None:
+        tract_order = 2*int(np.round(Fs/4000))
+    if glottal_order is None:
+        glottal_order = 2*int(np.round(Fs/2000))+4
+
+    wind = wind_func(nwind)
+
+    # output signals
+    glot = np.zeros(len(x))
+    dglot = np.zeros(len(x))
+    wins = np.zeros(len(x))
+
+    # filters, per frame
+    vt_coef = []
+    glot_coef = []
+
+    ist = 0
+
+    iaif = InverseFilter(Fs=Fs, nwind=nwind, 
+                         tract_order=tract_order,
+                         glottal_order=glottal_order,
+                         leaky_integration=leaky_integration)
+
+    while ist < len(x)-nwind:
+        xw = x[ist:ist+nwind]
+        g, gd, vt_f, g_f = iaif.apply(xw)
+
+        glot[ist:ist+nwind] += g*wind
+        dglot[ist:ist+nwind] += gd*wind
+        wins[ist:ist+nwind] += wind
+
+        vt_coef.append(vt_f)
+        glot_coef.append(g_f)
+        ist += nhop
+
+    idx = wins>0
+    glot[idx] /= wins[idx]
+    dglot[idx] /= wins[idx]
+    
+    return glot, dglot, np.array(vt_coef), np.array(glot_coef)
 
 class PaddedFilter(object):
     def __init__(self, input_signal,
@@ -62,12 +110,12 @@ class PaddedFilter(object):
         else:
             return self._padded_output[self.n_before:]
 
-    def apply_fir(self, b):
-        self._padded_output = sig.lfilter(b, [1], self._padded_input)
+    def apply_filter(self, b, a):
+        self._padded_output = sig.lfilter(b, a, self._padded_input)
         return self.output_signal
 
-    def apply_fir_to_last_output(self, b):
-        self._padded_output = sig.lfilter(b, [1], self._padded_output)
+    def apply_filter_to_last_output(self, b, a):
+        self._padded_output = sig.lfilter(b, a, self._padded_output)
         return self.output_signal
 
 
@@ -85,18 +133,20 @@ def fir_pre_phase(b, x, n_ramp=None):
     return y[n_ramp+1:]
 
 
-class InverseFilter:
+class InverseFilter(object):
     # implements an inverse filter object
     # based on Alku's IAIF
     #
     # P. Alku, "Glottal wave analysis with pitch synchronous iterative
     # adaptive inverse filtering", Speech Communication, vol. 11, no. 2-3,
     # pp. 109–118, 1992.
-    def __init__(self, Fs=1, tract_order=None, glottal_order=None,
+    def __init__(self, Fs=1, nwind=1024, wind_func=np.hanning, 
+            tract_order=None, glottal_order=None,
             leaky_integration=0.99, hpfilt=1):
         # Initialise an inverse filter object
         #
         # Fs:                sample rate (default 1)
+        # nwind:             size of inpt chunks
         # tract_order:       order for Vocal Tract LPC
         #                    (default: Fs/1000 + 4)
         # glottal_order:     order fot Glottal Source LPC
@@ -110,16 +160,68 @@ class InverseFilter:
         if glottal_order is None:
             glottal_order = 2*int(np.round(Fs/4000))+4
 
-        if hpfilt_in is None:
-            hpfilt_in = np.array([])
 
         self.Fs = Fs
         self.tract_order = tract_order
         self.glottal_order = glottal_order
-        self.leaky_integration = leaky_integration
+        try:
+            assert nwind > self.tract_order
+        except AssertionError:
+            logging.warning('Frame not analysed')
+            return
+        self.nwind = int(nwind)
         self.hpfilt = hpfilt
-        self.pre_filter = tract_order+1
-        self.init_preliminary_filter()
+        self.leaky_integrator = np.array([1, -leaky_integration])
+        #self.pre_filter = tract_order+1
+        self.wind = wind_func(self.nwind)
+        n_prel = self.init_preliminary_filter()
+        n_pad = int(np.round(n_prel/2-1))
+        self.n_pad = tract_order+1
+        # array for "a" coeffs of FIR filters
+        self.id = np.array([1])
+
+    def apply(self,x,n_it=1):
+        # Calculates the source and filter parameters
+        # (independent of preliminary hp filter)
+        # - Combined effect of lip radiation and glottal flow
+
+        # create a padded filter object for chained filtering
+        hp_filterer = PaddedFilter(n_after=len(self.hpfilt_b),
+                input_signal=x,
+                mode='zeros')
+
+        # HP filter to remove low frequency fluctuations
+        for ii in range(self.hpfilt):
+            y = hp_filterer.apply_filter_to_last_output(self.hpfilt_b,self.id)
+
+        # create a padded filter object for chained filtering
+        filter_machine = PaddedFilter(n_before=self.n_pad,
+                input_signal=y,
+                mode='ramp')
+
+        # first estimate of glottal flow and radiation filters
+        Hg = lpc(y*self.wind, 1)
+        y = filter_machine.apply_filter(Hg, self.id)
+
+        # subsequent iterations of glottal and vt estimations
+        for ii in range(n_it):
+            Hvt = lpc(y*self.wind, self.tract_order)
+            g = filter_machine.apply_filter(Hvt, self.id)
+            g = filter_machine.apply_filter_to_last_output(self.id,
+                    self.leaky_integrator)
+
+            Hg = lpc(g*self.wind, self.glottal_order)
+            y = filter_machine.apply_filter(Hg, self.id)
+            y = filter_machine.apply_filter_to_last_output(self.id,
+                    self.leaky_integrator)
+
+        # final estimation of vocal tract and glottal flow
+        Hvt = lpc(y*self.wind, self.tract_order)
+        dg = filter_machine.apply_filter(Hvt, self.id)
+        g = filter_machine.apply_filter_to_last_output(self.id,
+                self.leaky_integrator)
+
+        return g, dg, Hvt, Hg
 
     def init_preliminary_filter(self, order=None, freq_stop=40, freq_pass=70):
         # calculate filter coefficients for preliminary hp filter
@@ -130,50 +232,6 @@ class InverseFilter:
                                   [0, freq_stop, freq_pass, self.Fs/2],
                                   [0, 0, 1, 1],
                                   [1, 1])
-
-    def preliminary_filter(self, x):
-        # High pass filter signal to remove possible LF fluctuations
-        y = x.copy()
-        n_pad = int(np.round(len(self.hpfilt_b)/2-1))
-        for ii in range(self.hpfilt):
-            y = np.concatenate((y,np.zeros(n_pad)))
-            y = sig.lfilter(self.hpfilt_b, 1, y)
-            y = y[n_pad:]
-        return y
-
-    def source_filter_estimation(self, x):
-        # Calculates the source and filter parameters
-        # (independent of preliminary hp filter)
-        # - Combined effect of lip radiation and glottal flow
-
-        try:
-            assert len(x) > self.tract_order
-        except AssertionError:
-            logging.warning('Frame not analysed')
-            return
-
-        y = self.pre_phase_ramp(x)
-        y = self.glottal_first_estimate(y)
-        self.vocal_first_estimate()
-        y = self.glottal_second_estimate(y)
-        self.vocal_estimate()
-
-    def glottal_estimate(self,x):
-        # estimates the effect of the vocal tract
-        # and cancels it through inverse filtering
-        # 
-        # returns 
-        win = np.hanning(len(x))
-        Hg = sa.lpc(x*win,1)
-        #self.hg1 = Hg
-        # filter with pre_phase ramp
-        y = fir_pre_phase(Hg1,1,signal)
-
-        return hg, y 
-    
-    def vocal_estimate(self,x):
-        Hvt = sa.lpc(y*win, self.vocal_order)
-        g = fir_pre_phase(Hvt, 1, x)
-        
+        return len(self.hpfilt_b)
 
 

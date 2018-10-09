@@ -157,6 +157,7 @@ class SpeechSegmenter(object):
         self.pkthresh = self.sr/self.rough_window*detect_thresh
         
         self.bands=bands
+        self.rough_bands = bands
         self.refine_bands = refine_bands
     
     def set_signal(self, signal, sr=1):

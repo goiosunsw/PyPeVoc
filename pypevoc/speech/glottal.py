@@ -27,6 +27,54 @@ import logging
 
 from .SpeechAnalysis import lpc
 
+def iaif_ola(x, Fs=1, nwind=None, nhop=None, 
+             tract_order=None, glottal_order=None,
+             leaky_integration=0.99, wind_func=np.hanning):
+    
+    if nwind is None:
+        nwind = int(np.round(25/1000*Fs))
+    if nhop is None:
+        nhop = int(nwind/5)
+    if tract_order is None:
+        tract_order = 2*int(np.round(Fs/4000))
+    if glottal_order is None:
+        glottal_order = 2*int(np.round(Fs/2000))+4
+
+    wind = wind_func(nwind)
+
+    # output signals
+    glot = np.zeros(len(x))
+    dglot = np.zeros(len(x))
+    wins = np.zeros(len(x))
+
+    # filters, per frame
+    vt_coef = []
+    glot_coef = []
+
+    ist = 0
+
+    iaif = InverseFilter(Fs=Fs, nwind=nwind, 
+                         tract_order=tract_order,
+                         glottal_order=glottal_order,
+                         leaky_integration=leaky_integration)
+
+    while ist < len(x)-nwind:
+        xw = x[ist:ist+nwind]
+        g, gd, vt_f, g_f = iaif.apply(xw)
+
+        glot[ist:ist+nwind] += g*wind
+        dglot[ist:ist+nwind] += gd*wind
+        wins[ist:ist+nwind] += wind
+
+        vt_coeff.append(vt_f)
+        glot_coeff.append(g_f)
+        ist += nhop
+
+    idx = wins>0
+    glot[idx] /= wins[idx]
+    dglot[idx] /= wins[idx]
+    
+    return glot, dglot, np.array(vt_coeff), np.array(glot_coeff)
 
 class PaddedFilter(object):
     def __init__(self, input_signal,
@@ -112,20 +160,18 @@ class InverseFilter(object):
         if glottal_order is None:
             glottal_order = 2*int(np.round(Fs/4000))+4
 
-        if hpfilt_in is None:
-            hpfilt_in = np.array([])
 
         self.Fs = Fs
+        self.tract_order = tract_order
+        self.glottal_order = glottal_order
         try:
             assert nwind > self.tract_order
         except AssertionError:
             logging.warning('Frame not analysed')
             return
-        self.nwind = int(wind)
-        self.tract_order = tract_order
-        self.glottal_order = glottal_order
-        self.leaky_integrator = np.array([1, -leaky_integration])
+        self.nwind = int(nwind)
         self.hpfilt = hpfilt
+        self.leaky_integrator = np.array([1, -leaky_integration])
         #self.pre_filter = tract_order+1
         self.wind = wind_func(self.nwind)
         n_prel = self.init_preliminary_filter()
@@ -134,45 +180,45 @@ class InverseFilter(object):
         # array for "a" coeffs of FIR filters
         self.id = np.array([1])
 
-    def apply(self,x):
+    def apply(self,x,n_it=1):
         # Calculates the source and filter parameters
         # (independent of preliminary hp filter)
         # - Combined effect of lip radiation and glottal flow
 
         # create a padded filter object for chained filtering
-        hp_filterer = PaddedFilter(pad_after=len(self.hpfilt_b),
+        hp_filterer = PaddedFilter(n_after=len(self.hpfilt_b),
                 input_signal=x,
                 mode='zeros')
 
         # HP filter to remove low frequency fluctuations
         for ii in range(self.hpfilt):
-            y = hp_filterer(self.hpfilt_b)
+            y = hp_filterer.apply_filter_to_last_output(self.hpfilt_b,self.id)
 
         # create a padded filter object for chained filtering
-        filter_machine = PaddedFilter(pad_before=self.n_pad,
+        filter_machine = PaddedFilter(n_before=self.n_pad,
                 input_signal=y,
                 mode='ramp')
 
         # first estimate of glottal flow and radiation filters
-        Hg = sa.lpc(y*self.win, 1)
-        y = filter_machine.apply_filter(Hg, self.id, signal)
+        Hg = lpc(y*self.wind, 1)
+        y = filter_machine.apply_filter(Hg, self.id)
 
         # subsequent iterations of glottal and vt estimations
         for ii in range(n_it):
-            Hvt = sa.lpc(y*self.win, self.tract_order)
-            g = self.filter_machine.apply_filter(Hvt, self.id)
-            g = self.filter_machine.apply_filter_to_last_output(self.id,
+            Hvt = lpc(y*self.wind, self.tract_order)
+            g = filter_machine.apply_filter(Hvt, self.id)
+            g = filter_machine.apply_filter_to_last_output(self.id,
                     self.leaky_integrator)
 
-            Hg = sa.lpc(g*self.win, self.glottal_order)
-            y = self.filter_machine.apply_filter(Hg, self.id)
-            y = self.filter_machine.apply_filter_to_last_output(self.id,
+            Hg = lpc(g*self.wind, self.glottal_order)
+            y = filter_machine.apply_filter(Hg, self.id)
+            y = filter_machine.apply_filter_to_last_output(self.id,
                     self.leaky_integrator)
 
         # final estimation of vocal tract and glottal flow
-        Hvt = sa.lpc(y*self.win, self.tract_order)
-        dg = self.filter_machine.apply_filter(Hvt, self.id)
-        g = self.filter_machine.apply_filter_to_last_output(self.id,
+        Hvt = lpc(y*self.wind, self.tract_order)
+        dg = filter_machine.apply_filter(Hvt, self.id)
+        g = filter_machine.apply_filter_to_last_output(self.id,
                 self.leaky_integrator)
 
         return g, dg, Hvt, Hg
@@ -187,4 +233,5 @@ class InverseFilter(object):
                                   [0, 0, 1, 1],
                                   [1, 1])
         return len(self.hpfilt_b)
+
 

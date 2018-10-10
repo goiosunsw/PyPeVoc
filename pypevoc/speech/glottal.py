@@ -25,7 +25,13 @@ import numpy as np
 import scipy.signal as sig
 import logging
 
-from .SpeechAnalysis import lpc
+from .SpeechAnalysis import lpc as lpc_red
+
+# lpc_red ommits the first coefficient of an all-pole filter
+# needed for filtering
+def lpc(x, n):
+    y = lpc_red(x, n)
+    return np.concatenate([[1.], y])
 
 def iaif_ola(x, Fs=1, nwind=None, nhop=None, 
              tract_order=None, glottal_order=None,
@@ -36,9 +42,9 @@ def iaif_ola(x, Fs=1, nwind=None, nhop=None,
     if nhop is None:
         nhop = int(nwind/5)
     if tract_order is None:
-        tract_order = 2*int(np.round(Fs/4000))
+        tract_order = 2*int(np.round(Fs/2000))+4
     if glottal_order is None:
-        glottal_order = 2*int(np.round(Fs/2000))+4
+        glottal_order = 2*int(np.round(Fs/4000))
 
     wind = wind_func(nwind)
 
@@ -186,18 +192,21 @@ class InverseFilter(object):
         # - Combined effect of lip radiation and glottal flow
 
         # create a padded filter object for chained filtering
-        hp_filterer = PaddedFilter(n_after=len(self.hpfilt_b),
-                input_signal=x,
-                mode='zeros')
+        # hp_filterer = PaddedFilter(n_after=len(self.hpfilt_b),
+        #         input_signal=x,
+        #         mode='zeros')
+        hp_pad = int(np.round(len(self.hpfilt_b)/2-1))
 
         # HP filter to remove low frequency fluctuations
         for ii in range(self.hpfilt):
-            y = hp_filterer.apply_filter_to_last_output(self.hpfilt_b,self.id)
-
+            # y = hp_filterer.apply_filter_to_last_output(self.hpfilt_b,self.id)
+            y = np.concatenate([x, np.zeros(hp_pad)])
+            y = sig.lfilter(self.hpfilt_b, self.id, y)
+            y = y[hp_pad:]
         # create a padded filter object for chained filtering
         filter_machine = PaddedFilter(n_before=self.n_pad,
-                input_signal=y,
-                mode='ramp')
+                                      input_signal=y,
+                                      mode='ramp')
 
         # first estimate of glottal flow and radiation filters
         Hg = lpc(y*self.wind, 1)
@@ -231,7 +240,8 @@ class InverseFilter(object):
         self.hpfilt_b = sig.firls(order,
                                   [0, freq_stop, freq_pass, self.Fs/2],
                                   [0, 0, 1, 1],
-                                  [1, 1])
+                                  [1, 1],
+                                  fs=self.Fs)
         return len(self.hpfilt_b)
 
 

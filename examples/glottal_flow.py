@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as pl
 from scipy.io import wavfile
 
-from pypevoc.speech.glottal import iaif_ola
+from pypevoc.speech.glottal import iaif_ola, lpcc2pole
 
 try:
     filename = sys.argv[1]
@@ -38,5 +38,13 @@ else:
         ax[1].plot(t,np.array(g_m).flatten())
     finally:
         eng.quit()
+
+pl.figure()
+pl.specgram(w, Fs=sr, NFFT=2**10)
+for ii in range(vt.shape[0]):
+    t = len(w)/sr*ii/vt.shape[0]
+    p,bw = lpcc2pole(vt[ii,:],sr)
+    pl.scatter(np.ones(len(bw))*t, p, s=1/np.sqrt(bw), color='k')
+
 
 pl.show()

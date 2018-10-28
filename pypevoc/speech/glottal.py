@@ -35,7 +35,8 @@ def lpc(x, n):
 
 def iaif_ola(x, Fs=1, nwind=None, nhop=None, 
              tract_order=None, glottal_order=None,
-             leaky_integration=0.99, wind_func=np.hanning):
+             leaky_integration=0.99, wind_func=np.hanning,
+             n_it=1):
     
     if nwind is None:
         nwind = int(np.round(25/1000*Fs))
@@ -66,7 +67,7 @@ def iaif_ola(x, Fs=1, nwind=None, nhop=None,
 
     while ist < len(x)-nwind:
         xw = x[ist:ist+nwind]
-        g, gd, vt_f, g_f = iaif.apply(xw)
+        g, gd, vt_f, g_f = iaif.apply(xw, n_it=n_it)
 
         glot[ist:ist+nwind] += g*wind
         dglot[ist:ist+nwind] += gd*wind
@@ -245,3 +246,27 @@ class InverseFilter(object):
         return len(self.hpfilt_b)
 
 
+def lpcc2pole(b, sr=1):
+    def l2p_1(bb):
+        rts = np.roots(bb)
+        rts = rts[rts.imag>=0]
+        omega_n = np.arctan2(rts.imag,rts.real)
+        fp = omega_n*sr/2/np.pi
+        idx = np.argsort(fp)
+        fp = fp[idx]
+        bw = -1/2*(sr/2/np.pi) * np.log(np.abs(rts[idx]))
+        return fp, bw
+
+    if len(b.shape)>1:
+        poles = np.zeros((b.shape[0],int(b.shape[1]+1)))
+        bws = np.zeros((b.shape[0],int(b.shape[1]+1)))
+        for ii in range(b.shape[0]):
+            p,bw = l2p_1(b[ii,:])
+            poles[ii,:len(p)]=(p)
+            bws[ii,:len(p)]=(bw)
+        poles=np.array(poles)
+        bws=np.array(bws)
+    else:
+        poles, bws = l2p_1(b)
+
+    return poles, bws

@@ -43,7 +43,7 @@ class SilenceDetector(object):
     '''
     
     def __init__(self, x, sr=1, wind_sec=0.92, method = 'pct05',
-                 min_len = 0.1, max_len=5):
+                 min_len = 0.1, max_len=5, fmin=None, fmax=None):
         '''
         crate silence detector
         '''
@@ -51,7 +51,10 @@ class SilenceDetector(object):
         self.sr=sr
         self.nwind=int(wind_sec*sr)
         
-        self._calc_amplitude(nwind=self.nwind)
+        if fmin is None and fmax is None:
+            self._calc_amplitude(nwind=self.nwind)
+        else:
+            self._calc_band_amplitude(nwind=self.nwind, fmin=fmin, fmax=fmax)
         if method[0:3].lower()=='pct':
             try:
                 pctval = int(method[3:5])
@@ -73,6 +76,26 @@ class SilenceDetector(object):
         self.at, ampl = rmsWind(self.x,sr=self.sr,nwind=self.nwind,
                                     nhop = self.nfr)
         self.ax = 20*np.log10(ampl)
+
+    def _calc_band_amplitude(self,nwind=4096,fmin=50,fmax=5000):
+        '''
+        calculates amplitude in a frequency band for amplitude discriminator
+        '''
+        from ..FFTFilters import FilterBank, PiecewiseFilterSpec
+        self.nfr = int(nwind/2)
+        if fmin is None:
+            fb = FilterBank([PiecewiseFilterSpec(freq=fmax,mode='lp',sr=self.sr)],
+                            sr=self.sr,nwind=self.nwind,nhop=self.nfr)
+
+        elif fmax is None:
+            fb = FilterBank([PiecewiseFilterSpec(freq=fmin,mode='hp',sr=self.sr)],
+                            sr=self.sr,nwind=self.nwind,nhop=self.nfr)
+        else:
+            fb = FilterBank([PiecewiseFilterSpec(freq=[fmin,fmax],mode='bp',sr=self.sr)],
+                            sr=self.sr,nwind=self.nwind,nhop=self.nfr)
+        
+        ampl, self.at = fb.specout(self.x)
+        self.ax = 20*np.log10(ampl.flatten())
         
     def _k_means_discriminator(self, batch_size=45):
         from sklearn.cluster import MiniBatchKMeans

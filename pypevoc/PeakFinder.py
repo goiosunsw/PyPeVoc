@@ -69,10 +69,14 @@ class PeakFinder(object):
         self.sort_pos()
         # self.boundaries()
 
-    def filter_by_salience(self, rad=1):
+    def filter_by_salience(self, rad=1, sal=0):
         ''' Filters the peaks by salience.
             Any peak that is lower than the neighbouring 'rad' points
             is filtered out
+
+            optional:
+            * sal: salience (peaks must be at leas sal above other 
+                   values in a radius rad)
         '''
 
         npks = len(self.pos)
@@ -85,10 +89,27 @@ class PeakFinder(object):
             wmax = min(thispos + rad, len(self.x))
             w = self.x[wmin:wmax + 1]
 
-            if any(w > thisval):
+            if any(w+sal > thisval):
                 self.keep[idx] = False
 
         # self.keep = np.logical_and(self.keep, keep)
+
+    def filter_by_prominence(self, prom=0.0, all=False):
+        '''
+        Filter by peak prominence
+
+        prominence at leas prom above relative minimum
+
+        optional:
+        * all: include peaks that were filtered out before
+        '''
+        try:
+            prominence = self.prominence
+        except AttributeError:
+            self.find_prominence()
+            prominence = self.prominence
+
+        self.keep[prominence<prom] = False
 
     def findpos(self):
         """Finds the peaks positions
@@ -128,6 +149,33 @@ class PeakFinder(object):
         self.val = np.array([x[i] for i in self.pos])
         self.keep = np.ones(len(self.pos)).astype('bool')
 
+    def find_prominence(self, side_fun=np.min, all=False):
+        if not all:
+            pos = self.pos[self.keep] 
+            val = self.val[self.keep]
+        else:
+            pos = self.pos
+            val = self.val
+        lbound = np.concatenate(([0], pos))
+        rbound = np.concatenate((pos+1, [len(self.x)]))
+        sal_l = []
+        sal_r = []
+        for lb, rb, val in zip(lbound[:-1], rbound[:-1], val):
+            sal_l.append(val-np.min(self.x[lb:rb]))
+        for lb, rb, val in zip(lbound[1:], rbound[1:], val):
+            sal_r.append(val-np.min(self.x[lb:rb]))
+
+        sal_l = np.array(sal_l)
+        sal_r = np.array(sal_r)
+        prominence = side_fun(np.array([sal_l,sal_r]),axis=0)
+
+        if not all:
+            self.prominence = prominence
+        else:
+            self.prominence = np.zeros(len(self.pos))
+            self.prominence[self.keep] = prominence
+        return self.prominence[self.keep]
+
     def plot(self, logarithmic=False):
         """Plot a graphical representation of the peaks
 
@@ -139,7 +187,7 @@ class PeakFinder(object):
 
         pl.figure()
         pl.plot(self.x)
-        pl.hold('on')
+        #pl.hold('on')
         pl.plot(self.pos[self.keep], self.val[self.keep], 'og')
         pl.plot(self.pos[np.logical_not(self.keep)],
                 self.val[np.logical_not(self.keep)], 'om')

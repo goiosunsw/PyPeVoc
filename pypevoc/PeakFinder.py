@@ -87,7 +87,7 @@ class PeakFinder(object):
 
     @property
     def val(self):
-        return self._val[self._keep]
+        return self._fine_val[self._keep]
 
     @property
     def all_val(self):
@@ -95,7 +95,22 @@ class PeakFinder(object):
 
     @property
     def rough_val(self):
-        return self._val
+        return self._val[self._keep]
+
+    @property
+    def bounds(self):
+        b = np.array(self._bounds)
+        return self.x[b[self._keep,:]]
+
+    @property
+    def areas(self):
+        return self._areas[self._keep]
+
+    @property
+    def prominence(self):
+        return self._prominencex[self._keep]
+
+
 
     def filter_by_salience(self, rad=1, sal=0):
         ''' Filters the peaks by salience.
@@ -107,18 +122,18 @@ class PeakFinder(object):
                    values in a radius rad)
         '''
 
-        npks = len(self.pos)
+        npks = len(self._idx)
         # keep = np.ones(npks).astype('bool')
 
         for idx in range(npks):
-            thispos = self.pos[idx]
-            thisval = self.val[idx]
+            thispos = self._idx[idx]
+            thisval = self._val[idx]
             wmin = max(thispos-rad, 1)
             wmax = min(thispos + rad, len(self.y))
             w = self.y[wmin:wmax + 1]
 
             if any(w+sal > thisval):
-                self.keep[idx] = False
+                self._keep[idx] = False
 
         # self.keep = np.logical_and(self.keep, keep)
 
@@ -173,15 +188,17 @@ class PeakFinder(object):
                 pkmskamp[b] = th-1
                 n += 1
 
-        self._idx = np.array(pos)
+        self._idx = np.array(np.sort(pos))
         self._val = np.array([y[i] for i in self._idx])
-        self._keep = np.ones(len(self._idx)).astype('bool')
+        self._keep = np.ones(len(self._idx),dtype='bool')
+        self._order = np.arange(len(self._idx))
         self._fine_pos = self.x[self._idx]
+        self._fine_val = self._val
 
     def find_prominence(self, side_fun=np.min, all=False):
         if not all:
-            pos = self.pos
-            val = self.val
+            pos = self._idx[self._keep]
+            val = self._val[self._keep]
         else:
             pos = self.all_pos
             val = self.all_val
@@ -189,10 +206,10 @@ class PeakFinder(object):
         rbound = np.concatenate((pos+1, [len(self.y)]))
         sal_l = []
         sal_r = []
-        for lb, rb, val in zip(lbound[:-1], rbound[:-1], val):
-            sal_l.append(val-np.min(self.y[lb:rb]))
-        for lb, rb, val in zip(lbound[1:], rbound[1:], val):
-            sal_r.append(val-np.min(self.y[lb:rb]))
+        for lb, rb, v in zip(lbound[:-1], rbound[:-1], val):
+            sal_l.append(v - np.min(self.y[lb:rb]))
+        for lb, rb, v in zip(lbound[1:], rbound[1:], val):
+            sal_r.append(v - np.min(self.y[lb:rb]))
 
         sal_l = np.array(sal_l)
         sal_r = np.array(sal_r)
@@ -202,8 +219,8 @@ class PeakFinder(object):
             self.prominence = prominence
         else:
             self.prominence = np.zeros(len(self.pos))
-            self.prominence[self.keep] = prominence
-        return self.prominence[self.keep]
+            self.prominence[self._keep] = prominence
+        return self.prominence[self._keep]
 
     def plot(self, logarithmic=False):
         """Plot a graphical representation of the peaks
@@ -216,7 +233,6 @@ class PeakFinder(object):
 
         pl.figure()
         pl.plot(self.x, self.y)
-        #pl.hold('on')
         pl.plot(self.all_pos,
                 self.all_val, 'om')
         pl.plot(self.rough_pos, self.rough_val, 'og')
@@ -225,7 +241,6 @@ class PeakFinder(object):
             lminvals = self.y[lmins]
             pl.plot(lmins, lminvals, 'or')
         pl.plot(self.pos, self.val, 'dg')
-        pl.hold('off')
         if logarithmic:
             pl.gca().set_yscale('log')
 
@@ -236,10 +251,8 @@ class PeakFinder(object):
             (none)
         """
         if len(self.pos) > 1:
-            idx = np.argsort(self.val)[::-1]
-            self.pos = self.pos[idx]
-            self.val = self.val[idx]
-            self.keep = self.keep[idx]
+            idx = np.argsort(self._val)[::-1]
+            self._order = idx
             self.sorttype = 2
 
     def sort_pos(self):
@@ -249,36 +262,36 @@ class PeakFinder(object):
             (none)
         """
 
-        if len(self.pos) > 1:
-            idx = np.argsort(self.pos)
+        if len(self._idx) > 1:
+            idx = np.argsort(self._idx)
 
-            self.pos = self.pos[idx]
-            self.val = self.val[idx]
-            self.keep = self.keep[idx]
+            self._order = idx
             self.sorttype = 1
 
-    def boundaries(self):
+    def find_boundaries(self, all=False):
         """Find the local minima on either side of each peak
 
         Arguments:
             (none)
         """
         try:
-            prevb = np.argmin(self.y[0:self.pos[0]])
+            prevb = np.argmin(self.y[0:self._idx[0]])
         except IndexError:
             prevb = 0
 
         bounds = []
+    
+        if not all:
+            pos = self._idx[self._keep]
+        else:
+            pos = self._idx
 
-        npks = len(self.pos)
-
-        if self.sorttype != 1:
-            self.sort_pos()
+        npks = len(pos)
 
         for i in range(npks):
-            thismax = self.pos[i]
+            thismax = pos[i]
             if i < npks-1:
-                nextmax = self.pos[i + 1]
+                nextmax = pos[i + 1]
                 relb = np.argmin(self.y[thismax:nextmax])
                 nextb = relb + thismax
             else:
@@ -288,7 +301,7 @@ class PeakFinder(object):
             bounds.append([prevb, nextb])
             prevb = nextb
 
-        self.bounds = np.array(bounds)
+        self._bounds = np.array(bounds)
 
     def refine_opt(self, idx, yvec=None, rad=2):
         """use fit to quadratic to locate a fine maximum of
@@ -325,7 +338,7 @@ class PeakFinder(object):
             idx: index of the peak to interpolate
         """
 
-        pos = self.pos[idx]
+        pos = self._idx[idx]
         if yvec is not None:
             y = yvec
         else:
@@ -358,7 +371,7 @@ class PeakFinder(object):
             fpos = pos
             fval = sur[1]
 
-        return fpos, fval.tolist()
+        return np.interp(fpos, np.arange(len(self.x)), self.x), fval.tolist()
 
     def refine_all(self, logarithmic=False, rad=1):
         """use quadratic interpolation to refine all peaks
@@ -369,13 +382,15 @@ class PeakFinder(object):
 
         if logarithmic:
             y = np.log10(self.y)
+        else:
+            y = self.y
 
         # rpos = self.pos
         # rval = self.val
-        self.fpos = np.zeros(self.pos.shape)
-        self.fval = np.zeros(self.pos.shape)
+        self._fine_pos = np.zeros(self._idx.shape)
+        self._fine_val = np.zeros(self._idx.shape)
 
-        for i in range(len(self.pos)):
+        for i in range(len(self._idx)):
             if logarithmic:
                 if rad > 1:
                     fpos, fval = self.refine_opt(i, yvec=y, rad=rad)
@@ -386,54 +401,30 @@ class PeakFinder(object):
                     fpos, fval = self.refine_opt(i, rad=rad)
                 else:
                     fpos, fval = self.refine(i)
-            self.fpos[i] = fpos
+            self._fine_pos[i] = fpos
             if logarithmic:
-                self.fval[i] = 10**fval
+                self._fine_val[i] = 10**fval
             else:
-                self.fval[i] = fval
-
-    def get_pos(self, rough=False):
-        """return a vector with peak position
-
-        Arguments:
-            rough: do not return the refined position
-        """
-
-        if hasattr(self, 'fpos') and not rough:
-            return self.fpos[self.keep]
-        else:
-            return self.pos[self.keep]
-
-    def get_val(self, rough=False):
-        """return a vector with peak position
-
-        Arguments:
-            rough: do not return the refined position
-        """
-
-        if hasattr(self, 'fpos') and not rough:
-            return self.fval[self.keep]
-        else:
-            return self.val[self.keep]
+                self._fine_val[i] = fval
 
     def calc_individual_area(self, idx, funct=None, max_rad=None):
-        lims = self.bounds[idx]
+        lims = self._bounds[idx]
         if funct is None:
             return sum(self.y[lims[0]:lims[-1]])
         else:
             return sum(funct(self.y[lims[0]:lims[-1]]))
 
     def get_areas(self, funct=None, max_rad=None):
-        if not hasattr(self, 'bounds'):
-            self.boundaries()
+        if not hasattr(self, '_bounds'):
+            self.find_boundaries()
 
         areas = []
-        for idx in range(len(self.pos)):
+        for idx in range(len(self._idx)):
             areas.append(self.calc_individual_area(idx, funct=funct))
 
-        self.areas = np.array(areas)
+        self._areas = np.array(areas)
 
-        return self.areas[self.keep]
+        return self._areas[self._keep]
 
     def get_pos_val(self, rough=False):
         """return a vector with peak position in first column
@@ -443,10 +434,7 @@ class PeakFinder(object):
             rough: do not return the refined position
         """
 
-        if hasattr(self, 'fpos') and not rough:
-            rvec = np.array(zip(self.fpos[self.keep], self.fval[self.keep]))
-        else:
-            rvec = np.array(zip(self.pos[self.keep], self.val[self.keep]))
+        rvec = np.array(zip(self.pos, self.val))
 
         return rvec
 
@@ -464,10 +452,23 @@ class PeakFinder(object):
                 pass
 
             try:
-                thisd['bounds'] = self.bounds[self._keep][ii]
+                thisd['l_bound'] = self.bounds[ii,0]
+                thisd['r_bound'] = self.bounds[ii,1]
+            except AttributeError:
+                pass
+ 
+            try:
+                thisd['area'] = self.areas[ii]
             except AttributeError:
                 pass
         
             ret.append(thisd)
 
         return ret
+
+    def to_data_frame(self):
+        """
+        Return a pandas dataframe with peak information
+        """
+        import pandas
+        return pandas.DataFrame(self.to_dict())

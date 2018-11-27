@@ -32,7 +32,7 @@ import numpy as np
 
 class PeakFinder(object):
 
-    def __init__(self, x, npeaks=None, minrattomax=None, minval=None):
+    def __init__(self, y, x=None, npeaks=None, minrattomax=None, minval=None):
         """Creates the peak finder object from a numpy array
 
         Arguments:
@@ -47,27 +47,55 @@ class PeakFinder(object):
             minval:      an absolute minimum value of peak
         """
 
-        self.x = np.array(np.squeeze(x))
-        self.pos = np.array([])
-        self.val = np.array([])
+        self.y = np.array(np.squeeze(y))
+        if x is not None:
+            self.x = np.array(np.squeeze(x))
+        else:
+            self.x = np.arange(len(self.y))
+        self._idx = np.array([])
+        self._val = np.array([])
         if minrattomax is None:
             self.minamp = minval
         else:
-            self.minamp = self.x.max()*minrattomax
+            self.minamp = self.y.max()*minrattomax
 
         self.sorttype = 0
 
         if not npeaks:
-            self.npeaks = len(self.x)
+            self.npeaks = len(self.y)
         else:
             self.npeaks = npeaks
 
         if not self.minamp:
-            self.minamp = np.min(self.x)
+            self.minamp = np.min(self.y)
 
         self.findpos()
-        self.sort_pos()
+        #self.sort_pos()
         # self.boundaries()
+
+    @property
+    def pos(self):
+        return self._fine_pos[self._keep]
+
+    @property
+    def rough_pos(self):
+        return self.x[self._idx[self._keep]]
+
+    @property
+    def all_pos(self):
+        return self.x[self._idx]
+
+    @property
+    def val(self):
+        return self._val[self._keep]
+
+    @property
+    def all_val(self):
+        return self._val
+
+    @property
+    def rough_val(self):
+        return self._val
 
     def filter_by_salience(self, rad=1, sal=0):
         ''' Filters the peaks by salience.
@@ -86,8 +114,8 @@ class PeakFinder(object):
             thispos = self.pos[idx]
             thisval = self.val[idx]
             wmin = max(thispos-rad, 1)
-            wmax = min(thispos + rad, len(self.x))
-            w = self.x[wmin:wmax + 1]
+            wmax = min(thispos + rad, len(self.y))
+            w = self.y[wmin:wmax + 1]
 
             if any(w+sal > thisval):
                 self.keep[idx] = False
@@ -109,7 +137,7 @@ class PeakFinder(object):
             self.find_prominence()
             prominence = self.prominence
 
-        self.keep[prominence<prom] = False
+        self._keep[prominence<prom] = False
 
     def findpos(self):
         """Finds the peaks positions
@@ -118,19 +146,19 @@ class PeakFinder(object):
             (none)
         """
 
-        x = self.x
+        y = self.y
 
-        minx = np.min(x)
+        miny = np.min(y)
 
-        peakmask = (x[0:-2] < x[1:-1])*(x[1:-1] >= x[2:]).astype(int)
-        pkmskamp = peakmask*(x[1:-1]-minx)
+        peakmask = (y[0:-2] < y[1:-1])*(y[1:-1] >= y[2:]).astype(int)
+        pkmskamp = peakmask*(y[1:-1]-miny)
         # print(pkmskamp)
 
         pos = []
 
         m = pkmskamp.max()
         b = pkmskamp.argmax()
-        th = self.minamp-minx
+        th = self.minamp-miny
         n = 1
 
         if m > th:
@@ -145,25 +173,26 @@ class PeakFinder(object):
                 pkmskamp[b] = th-1
                 n += 1
 
-        self.pos = np.array(pos)
-        self.val = np.array([x[i] for i in self.pos])
-        self.keep = np.ones(len(self.pos)).astype('bool')
+        self._idx = np.array(pos)
+        self._val = np.array([y[i] for i in self._idx])
+        self._keep = np.ones(len(self._idx)).astype('bool')
+        self._fine_pos = self.x[self._idx]
 
     def find_prominence(self, side_fun=np.min, all=False):
         if not all:
-            pos = self.pos[self.keep] 
-            val = self.val[self.keep]
-        else:
             pos = self.pos
             val = self.val
+        else:
+            pos = self.all_pos
+            val = self.all_val
         lbound = np.concatenate(([0], pos))
-        rbound = np.concatenate((pos+1, [len(self.x)]))
+        rbound = np.concatenate((pos+1, [len(self.y)]))
         sal_l = []
         sal_r = []
         for lb, rb, val in zip(lbound[:-1], rbound[:-1], val):
-            sal_l.append(val-np.min(self.x[lb:rb]))
+            sal_l.append(val-np.min(self.y[lb:rb]))
         for lb, rb, val in zip(lbound[1:], rbound[1:], val):
-            sal_r.append(val-np.min(self.x[lb:rb]))
+            sal_r.append(val-np.min(self.y[lb:rb]))
 
         sal_l = np.array(sal_l)
         sal_r = np.array(sal_r)
@@ -186,17 +215,16 @@ class PeakFinder(object):
         import pylab as pl
 
         pl.figure()
-        pl.plot(self.x)
+        pl.plot(self.x, self.y)
         #pl.hold('on')
-        pl.plot(self.pos[self.keep], self.val[self.keep], 'og')
-        pl.plot(self.pos[np.logical_not(self.keep)],
-                self.val[np.logical_not(self.keep)], 'om')
+        pl.plot(self.all_pos,
+                self.all_val, 'om')
+        pl.plot(self.rough_pos, self.rough_val, 'og')
         if hasattr(self, 'bounds'):
             lmins = np.unique(self.bounds.flatten())
-            lminvals = self.x[lmins]
+            lminvals = self.y[lmins]
             pl.plot(lmins, lminvals, 'or')
-        if hasattr(self, 'fpos'):
-            pl.plot(self.fpos[self.keep], self.fval[self.keep], 'dg')
+        pl.plot(self.pos, self.val, 'dg')
         pl.hold('off')
         if logarithmic:
             pl.gca().set_yscale('log')
@@ -236,7 +264,7 @@ class PeakFinder(object):
             (none)
         """
         try:
-            prevb = np.argmin(self.x[0:self.pos[0]])
+            prevb = np.argmin(self.y[0:self.pos[0]])
         except IndexError:
             prevb = 0
 
@@ -251,18 +279,18 @@ class PeakFinder(object):
             thismax = self.pos[i]
             if i < npks-1:
                 nextmax = self.pos[i + 1]
-                relb = np.argmin(self.x[thismax:nextmax])
+                relb = np.argmin(self.y[thismax:nextmax])
                 nextb = relb + thismax
             else:
-                nextmax = len(self.x)-1
-                nextb = len(self.x)-1
+                nextmax = len(self.y)-1
+                nextb = len(self.y)-1
 
             bounds.append([prevb, nextb])
             prevb = nextb
 
         self.bounds = np.array(bounds)
 
-    def refine_opt(self, idx, xvec=None, rad=2):
+    def refine_opt(self, idx, yvec=None, rad=2):
         """use fit to quadratic to locate a fine maximum of
         the peak position and value
 
@@ -271,15 +299,15 @@ class PeakFinder(object):
         """
 
         pos = self.pos[idx]
-        if xvec is not None:
-            x = xvec
+        if yvec is not None:
+            y = yvec
         else:
-            x = self.x
+            y = self.y
 
         # val = self.val[idx]
         imin = max(1, pos-rad)
-        imax = min(pos + rad + 1, len(x))
-        sur = x[imin:imax]
+        imax = min(pos + rad + 1, len(y))
+        sur = y[imin:imax]
         ifit = np.arange(imin-pos, imax-pos)
 
         pp = np.polyfit(ifit, sur, 2)
@@ -289,7 +317,7 @@ class PeakFinder(object):
 
         return fpos, fval.tolist()
 
-    def refine(self, idx, fun=None, xvec=None):
+    def refine(self, idx, fun=None, yvec=None):
         """use quadratic interpolation to locate a fine maximum of
         the peak position and value
 
@@ -298,18 +326,18 @@ class PeakFinder(object):
         """
 
         pos = self.pos[idx]
-        if xvec is not None:
-            x = xvec
+        if yvec is not None:
+            y = yvec
         else:
-            x = self.x
+            y = self.y
 
         if fun:
             from scipy.optimize import broyden1 as opt
             # val = fun(self.val[idx])
-            sur = fun(x[pos-1:pos+2])
+            sur = fun(y[pos-1:pos+2])
         else:
             # val = self.val[idx]
-            sur = x[pos-1:pos+2]
+            sur = y[pos-1:pos+2]
 
         if sur[1] > sur[0] and sur[1] >= sur[2]:
             c = sur[1]
@@ -340,7 +368,7 @@ class PeakFinder(object):
         """
 
         if logarithmic:
-            x = np.log10(self.x)
+            y = np.log10(self.y)
 
         # rpos = self.pos
         # rval = self.val
@@ -350,9 +378,9 @@ class PeakFinder(object):
         for i in range(len(self.pos)):
             if logarithmic:
                 if rad > 1:
-                    fpos, fval = self.refine_opt(i, xvec=x, rad=rad)
+                    fpos, fval = self.refine_opt(i, yvec=y, rad=rad)
                 else:
-                    fpos, fval = self.refine(i, xvec=x)
+                    fpos, fval = self.refine(i, yvec=y)
             else:
                 if rad > 1:
                     fpos, fval = self.refine_opt(i, rad=rad)
@@ -391,9 +419,9 @@ class PeakFinder(object):
     def calc_individual_area(self, idx, funct=None, max_rad=None):
         lims = self.bounds[idx]
         if funct is None:
-            return sum(self.x[lims[0]:lims[-1]])
+            return sum(self.y[lims[0]:lims[-1]])
         else:
-            return sum(funct(self.x[lims[0]:lims[-1]]))
+            return sum(funct(self.y[lims[0]:lims[-1]]))
 
     def get_areas(self, funct=None, max_rad=None):
         if not hasattr(self, 'bounds'):
@@ -421,3 +449,25 @@ class PeakFinder(object):
             rvec = np.array(zip(self.pos[self.keep], self.val[self.keep]))
 
         return rvec
+
+    def to_dict(self):
+        """
+        Return a list of dictionary with peak characteristics
+        """
+        ret = []
+        for ii, (pos, val) in enumerate(zip(self.pos,self.val)):
+            thisd = {'pos': pos,
+                     'val': val}
+            try:
+                thisd['sal'] = self.prominence[self._keep][ii]
+            except AttributeError:
+                pass
+
+            try:
+                thisd['bounds'] = self.bounds[self._keep][ii]
+            except AttributeError:
+                pass
+        
+            ret.append(thisd)
+
+        return ret

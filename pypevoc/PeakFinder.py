@@ -108,7 +108,7 @@ class PeakFinder(object):
 
     @property
     def prominence(self):
-        return self._prominencex[self._keep]
+        return self._prominence[self._keep]
 
 
 
@@ -147,10 +147,10 @@ class PeakFinder(object):
         * all: include peaks that were filtered out before
         '''
         try:
-            prominence = self.prominence
+            prominence = self._prominence
         except AttributeError:
             self.find_prominence()
-            prominence = self.prominence
+            prominence = self._prominence
 
         self._keep[prominence<prom] = False
 

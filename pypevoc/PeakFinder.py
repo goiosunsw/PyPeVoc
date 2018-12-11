@@ -110,7 +110,24 @@ class PeakFinder(object):
     def prominence(self):
         return self._prominence[self._keep]
 
+    ### Back-compatibility functions ###
+    def get_pos(self, rough=False):
+        if rough:
+            return self.rough_pos
+        else:
+            return self.pos
 
+    def get_val(self, rough=False):
+        if rough:
+            return self.rough_val
+        else:
+            return self.val
+
+    def boundaries(self):
+        self.find_boundaries()
+        return self.bounds
+
+    ### End of back-compatibility functions ###
 
     def filter_by_salience(self, rad=1, sal=0):
         ''' Filters the peaks by salience.
@@ -118,7 +135,7 @@ class PeakFinder(object):
             is filtered out
 
             optional:
-            * sal: salience (peaks must be at leas sal above other 
+            * sal: salience (peaks must be at leas sal above other
                    values in a radius rad)
         '''
 
@@ -280,7 +297,7 @@ class PeakFinder(object):
             prevb = 0
 
         bounds = []
-    
+
         if not all:
             pos = self._idx[self._keep]
         else:
@@ -456,12 +473,12 @@ class PeakFinder(object):
                 thisd['r_bound'] = self.bounds[ii,1]
             except AttributeError:
                 pass
- 
+
             try:
                 thisd['area'] = self.areas[ii]
             except AttributeError:
                 pass
-        
+
             ret.append(thisd)
 
         return ret

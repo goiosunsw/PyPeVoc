@@ -4,6 +4,7 @@ import scipy.signal as sig
 import scipy.linalg as lg
 from scipy.io import wavfile
 from .. import FFTFilters as ftf
+from ..PeakFinder import PeakFinder
 
 def lpc(w, order, axis=-1):
     """
@@ -182,7 +183,7 @@ def Periodogram(w, Fs, tWind=0.025, tHop=0.0125,
 
     return Sxx, freqS
 
-def lpc2form(self, a, Fs=1.0):
+def lpc2form(a, Fs=1.0):
     '''
     Convert all-pole coefficients to resonance frequencies
     and bandwidths
@@ -207,9 +208,18 @@ def lpc2form(self, a, Fs=1.0):
 
     return FreqS, BW
 
+def lpc2form_full(a, Fs=1.0, npts=1024):
+    FreqS, BW = lpc2form(a, Fs)
+    omega, h = sig.freqz([1],np.concatenate(([1], a)), worN=npts)
+    f = omega/np.pi * Fs/2
+    pks = PeakFinder(x=f, y=np.abs(h))
+    pks.refine_all()
+
+    return FreqS, BW, pks.pos, pks.val
+
 def Formants(w, Fs, tWind=0.025, tHop=0.0125,
                     fMin=50, fMax=5500, bwMax=400,
-                    modelOrd=10, hpFreq=50):
+                    modelOrd=10, hpFreq=50, full=False):
     '''Estimate formants from waveform w with sample rate Fs
 
        tWind:      window length in seconds
@@ -221,6 +231,7 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
        modelOrder: model order for linear prediction (LPC)
        hpFreq:     cutoff frequency of pre-emphasis filter
                     (high-pass, 1st order)
+       full:       also calclate amplitudes and freqs of peaks
     '''
 
     # pre-emphasise
@@ -260,6 +271,9 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
 
     Form = np.nan*np.ones((nFrames,int(modelOrd/2)));
     BandWidths = np.nan*np.ones((nFrames,int(modelOrd/2)));
+    if full:
+        Peaks = np.nan*np.ones((nFrames,int(modelOrd/2)));
+        Amplitudes = np.nan*np.ones((nFrames,int(modelOrd/2)));
     Time = np.arange(nFrames+0)*hopLenSam/Fsf+windowLenSam/Fsf/2
 
 
@@ -280,31 +294,29 @@ def Formants(w, Fs, tWind=0.025, tHop=0.0125,
         # call LPC
         # A, err, rcoeff = lpc(XW,modelOrd);
         A = lpc(XW,modelOrd);
-        #RTS = np.roots(A)
-        RTS = np.roots(np.concatenate(([1],A)));
 
-        # roots are complex conjugate pairs
-        RTS = RTS[np.imag(RTS)>=0];
-        AngZ = np.arctan2(np.imag(RTS),np.real(RTS));
-
-        # Convert normalised frequency to freq.
-        nFreq = AngZ*(Fsf/(2*np.pi))
-        Indices = np.argsort(nFreq);
-        FreqS = nFreq[Indices]
-        FreqS = FreqS[FreqS>0]
-        # Bandwidths are the distance to the unit circle
-        BW = -1/2*(Fsf/(2*np.pi))*np.log(np.abs(RTS[Indices]))
-
+        if full:
+            FreqS, BW, pkF, pkA = lpc2form_full(A, Fs)
+        else:
+            FreqS, BW = lpc2form(A, Fs)
         NN = 0
         for KK in range(len(FreqS)):
             if (FreqS[KK] > fMin and FreqS[KK] < fMax-fMin and BW[KK] <bwMax):
                 Form[FN, NN] = FreqS[KK]
                 BandWidths[FN, NN] = BW[KK]
+                if full:
+                    if len(pkF)>0:
+                        idx = np.argmin(np.abs(pkF-FreqS[KK]))
+                        Peaks[FN, NN] = pkF[idx]
+                        Amplitudes[FN, NN] = pkA[idx]
                 NN = NN + 1
             else:
                 #print('Rejected f={}, bw={}'.format(FreqS[KK],BW[KK]))
                 pass
-    return Time, Form, BandWidths
+    if full:
+        return Time, Form, BandWidths, Peaks, Amplitudes
+    else:
+        return Time, Form, BandWidths
 
 def rmsWind(w, nwind=256, nhop=None, windfunc=np.ones, sr=1):
     '''

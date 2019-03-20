@@ -101,7 +101,7 @@ class PeakFinder(object):
     def bounds(self):
         b = np.array(self._bounds)
         return self.x[b[self._keep,:]]
-
+    
     @property
     def areas(self):
         return self._areas[self._keep]
@@ -109,8 +109,6 @@ class PeakFinder(object):
     @property
     def prominence(self):
         return self._prominence[self._keep]
-
-
 
     def filter_by_salience(self, rad=1, sal=0):
         ''' Filters the peaks by salience.
@@ -472,3 +470,20 @@ class PeakFinder(object):
         """
         import pandas
         return pandas.DataFrame(self.to_dict())
+
+    # backwards compat
+    def boundaries(self):
+        try:
+            self._bounds
+        except AttributeError:
+            self.find_boundaries()
+        b = np.array(self._bounds)
+        try:
+            return self.x[b[self._keep, :]]
+        except IndexError:
+            return np.array([])
+
+    def get_pos(self):
+        return np.array(self.pos)
+
+

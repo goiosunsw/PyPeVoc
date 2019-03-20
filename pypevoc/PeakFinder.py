@@ -192,7 +192,7 @@ class PeakFinder(object):
         self._val = np.array([y[i] for i in self._idx])
         self._keep = np.ones(len(self._idx),dtype='bool')
         self._order = np.arange(len(self._idx))
-        self._fine_pos = self.x[self._idx]
+        self._fine_pos = np.array([self.x[ii] for ii in self._idx])
         self._fine_val = self._val
 
     def find_prominence(self, side_fun=np.min, all=False):
@@ -280,7 +280,7 @@ class PeakFinder(object):
             prevb = 0
 
         bounds = []
-    
+
         if not all:
             pos = self._idx[self._keep]
         else:
@@ -456,12 +456,12 @@ class PeakFinder(object):
                 thisd['r_bound'] = self.bounds[ii,1]
             except AttributeError:
                 pass
- 
+
             try:
                 thisd['area'] = self.areas[ii]
             except AttributeError:
                 pass
-        
+
             ret.append(thisd)
 
         return ret

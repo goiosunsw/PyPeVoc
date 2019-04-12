@@ -154,8 +154,8 @@ class Periodicity(object):
                 peaks.refine_all()
                 # peaks.plot()
 
-                pkpos = peaks.get_pos() + imin
-                pkstr = peaks.get_val()
+                pkpos = peaks.pos + imin
+                pkstr = peaks.val
 
                 # keep = pkpos<self.maxdelay
                 # pkpos = pkpos[keep]
@@ -173,8 +173,8 @@ class Periodicity(object):
                 fftpeaks = pf(np.abs(xf[0:int(self.nwind/2)]),
                                          npeaks=self.ncand)
                 # periodicity corresponding to fft peaks:
-                fpos = fftpeaks.get_pos()
-                fval = fftpeaks.get_val()
+                fpos = fftpeaks.pos
+                fval = fftpeaks.val
                 fposkeep = fpos[fval > np.max(fval*self.fftthresh)]
                 fftpkpos = self.nwind / fposkeep
 
@@ -314,7 +314,7 @@ class PeriodSeries(object):
             self.maxdelay = maxdelay
 
         if hop is None:
-            hop = round(self.nwind/2)
+            hop = self.nwind//2
 
         self.hop = hop
 
@@ -383,9 +383,10 @@ class PeriodSeries(object):
         sys.stderr.write("Calculating local periodicity... \n")
 
         for idx in idxvec:
-            self.per_at_index(idx)
+            pp = self.per_at_index(idx)
             sys.stderr.write("\r{:6.2f}%%".format(idx*100/idxmax))
             sys.stderr.flush()
+            self.periods.append(pp)
 
         sys.stderr.write("\ndone\n"  )
 

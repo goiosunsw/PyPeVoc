@@ -204,7 +204,8 @@ class PV:
                 realph.append(thisph + np.pi * df/self.fstep)
 
         self.oldfft = fx
-        return f, mag, ph, realph, binno
+        totalmag = np.sqrt(np.sum(famp**2))
+        return f, mag, ph, realph, binno, totalmag
 
     def run_pv(self):
 
@@ -213,6 +214,7 @@ class PV:
         allph = []
         allrealph = []
         allbin = []
+        totalmag = []
         t = []
 
         curpos = 0
@@ -224,7 +226,8 @@ class PV:
             realph = np.zeros(self.npeaks)
             binno = np.zeros(self.npeaks)
 
-            ff, magf, phf, realf, binf = self.calc_pv_frame(curpos)
+            ff, magf, phf, realf, binf, tmag = self.calc_pv_frame(curpos)
+            totalmag.append(tmag)
 
             f[0:len(ff)] = ff
             mag[0:len(magf)] = magf
@@ -253,6 +256,7 @@ class PV:
         # time values
         self.t = np.array(t)
         self.nframes = len(t)
+        self.totalmag = totalmag
 
     def calc_harmonic_power(self, f_threshold=0.01):
         """
@@ -399,7 +403,13 @@ class PV:
             return self.mag[np.arange(self.f.shape[0]),
                             self.fundamental_idx]
 
+    @property
+    def partial_sum_magnitude(self):
+        return np.sqrt(np.sum(self.mag**2,axis=1))
 
+    @property
+    def partial_magnitude_ratio(self):
+        return self.partial_sum_magnitude/self.totalmag
 
 class PVHarmonic(PV):
     def __init__(self, *args, **kwargs):

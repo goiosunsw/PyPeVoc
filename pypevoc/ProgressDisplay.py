@@ -40,6 +40,21 @@ try:
 except ImportError:
     have_ipywidgets=False
 
+def in_ipynb():
+    try:
+        cfg = get_ipython().config
+        try:
+            ipk = cfg['IPKernelApp']
+            if len(ipk)==0:
+                return False
+        except KeyError:
+            return False
+        return True
+    except NameError:
+        return False
+
+
+
 class Progress(object):
     def __init__(self, end=1.):
         """
@@ -47,17 +62,21 @@ class Progress(object):
         """
         self.current_val = 0.0
         self.max_val = end
-        if have_ipywidgets:
-            self.label = HTML()
-            self.progress = IntProgress(min=0,max=100,value=1)
-            self.progress.bar_style = 'info'
-            self.progressHTML = VBox([self.label, self.progress])
-            display(self.progressHTML)
-            self.redraw = self._redraw_ipywidgets
-        elif have_ipython:
-            self.redraw = self._redraw_ipython
+        if in_ipynb():
+            if have_ipywidgets:
+                self.label = HTML()
+                self.progress = IntProgress(min=0,max=100,value=1)
+                self.progress.bar_style = 'info'
+                self.progressHTML = VBox([self.label, self.progress])
+                display(self.progressHTML)
+                self.redraw = self._redraw_ipywidgets
+                self.cleanup = self._cleanup_ipywidgets
+            else:
+                self.redraw = self._redraw_ipython
+                self.cleanup = self._cleanup_ipython
         else:
             self.redraw = self._redraw_console
+            self.cleanup = self._cleanup_console
 
 
     def update(self, val):
@@ -77,12 +96,25 @@ class Progress(object):
         sys.stdout.flush()
 
     def _redraw_console(self):
-        print('\r', self)
+        print('\r'+str(self),end=" ")
         sys.stdout.flush()
         
     def __str__(self):
         pct = self.current_val/self.max_val*100
         return '%d / %d (%.2f%%)'%(self.current_val,self.max_val,pct)
+
+    def _cleanup_console(self):
+        print('\n')
+
+    def _cleanup_ipython(self):
+        pass
+
+    def _cleanup_ipywidgets(self):
+        pass
+
+    def finish(self):
+        self.update(self.max_val)
+        self.cleanup()
 
 
         

@@ -6,7 +6,7 @@
 #  Do a Phase vocoder decomposition of a signal into its quasi-sinusoidal
 # components
 #
-#  Copyright 2015 Andre Almeida <andre.almeida@univ-lemans.fr>
+#  Copyright 2015 Andre Almeida <andregoios@gmail.com>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

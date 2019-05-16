@@ -270,7 +270,9 @@ class HeterodyneHarmonic:
         
     @property
     def f(self):
-        return np.array([self.f0*(n+1) for n in range(self.nharm)])
+        tvec = np.arange(self.nsamp)/self.sr
+        f0 = np.interp(self.t, tvec, self.f0)
+        return np.array([f0*(n+1) for n in range(self.nharm)]).T
 
     @property
     def t(self):
@@ -406,7 +408,7 @@ class HeterodyneHarmonic:
         """
         tvec = np.arange(self.nsamp)/self.sr
         hf = np.interp(tvec, self.harmonic_times(n), self.harmonic_amplitudes(n))
-        idx = (self.f<self.fmin) | (self.f>self.fmax) | (self.f*n>self.sr/2.2)
+        idx = (self.f0<self.fmin) | (self.f0>self.fmax) | (self.f0*n>self.sr/2.2)
         rmsmin = np.max(np.abs(hf))*self.ampthr
         idx = idx | (np.abs(hf)<rmsmin)
         hf[idx] = 0

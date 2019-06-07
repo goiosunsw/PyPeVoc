@@ -7,7 +7,6 @@ def my_tests():
     test_suite = test_loader.discover('tests', pattern='test_*.py')
     return test_suite
 
-
 setup(name='pypevoc',
       version='0.1',
       description='Pure python sound analysis tools',

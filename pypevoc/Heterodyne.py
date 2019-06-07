@@ -326,9 +326,19 @@ class HeterodyneHarmonic:
         return a reference variable-frequency signal
         with frequency equal to n* the harmonic of the frequency vector
         """
-        omega = self.fvec*2*np.pi*n
+        return self.heterodyner_signal_from_f(self.fvec*n)
+
+    def heterodyner_signal_from_f(self,f):
+        """
+        calculate a heterodyner signal based on the normalised
+        frequency vector
+
+        input a normalised frequency vector
+        """
+        omega = f*2*np.pi
         phvec = np.cumsum(omega)
         return np.exp(1j*phvec)
+
 
     def calc_adjusted_freq(self, fvec, nwind=None, nhop=None):
         """
@@ -343,8 +353,7 @@ class HeterodyneHarmonic:
         x = self.x
         sr = self.sr
         tvec = np.arange(len(x))/sr
-        self.fvec = fvec/sr
-        hetsig = self.heterodyner_signal(n=1)
+        hetsig = self.heterodyner_signal_from_f(fvec)
         if nwind is None:
             wind = self.wind
         else:
@@ -356,7 +365,7 @@ class HeterodyneHarmonic:
         h, ih = heterodyne(x, hetsig, wind=wind, hop=nhop)
         th = ih/sr
         dph = np.concatenate(([0], np.diff(np.unwrap(np.angle(h)))))
-        f0c = np.interp(th,tvec,self.fvec)-dph/(nhop)/2/np.pi 
+        f0c = np.interp(th,tvec,fvec)-dph/(nhop)/2/np.pi 
         return f0c, th
 
     def set_fvec(self, f0c, th=None, adjust=False):

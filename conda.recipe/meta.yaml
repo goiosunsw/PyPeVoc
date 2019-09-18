@@ -1,0 +1,35 @@
+{% set version = "0.2.0" %}
+
+package:
+  name: "pypevoc"
+  version: {{ version }}
+
+source:
+  path: ../
+  # git-url: https://github.com/goiosunsw/pypevoc.git
+
+build:
+  number: 0
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+
+requirements:
+  host:
+    - numpy
+    - pip
+    - python
+  run:
+    - numpy
+    - python
+
+about:
+  home: "https://github.com/goiosunsw/pypevoc.git"
+  license: "GNU Lesser General Public v3 or later (LGPLv3+)"
+  license_family: "LGPL"
+  license_file: ""
+  summary: "Pure python phase vocoder"
+  doc_url: ""
+  dev_url: ""
+
+extra:
+  recipe-maintainers:
+    - goiosunsw

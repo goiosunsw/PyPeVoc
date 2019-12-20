@@ -227,7 +227,7 @@ class HeterodyneHarmonic:
     """
 
     def __init__(self, x, sr=1.0, tf=None, f=None, nper=None, nwind=1024, nhop=None,
-                 wfun=np.hanning, ampthr=0.1, nharm=5, fmin=0.1, fmax=1000):
+                 wfun=np.hanning, ampthr=0.1, nharm=5, fmin=0.1, fmax=1000, include_dc=False):
         """
         Perform a sine sum analysis on signal x with sampling rate sr.
 
@@ -245,6 +245,7 @@ class HeterodyneHarmonic:
             * wfun:     windowing function
             * nharm:    number of harmonics to use in decomposition
             * ampthr:   amplitude threshold for filtering in resynthesis
+            * include_dc: calculate DC amplitude
         """
         self.x = x
         self.sr = sr
@@ -259,6 +260,7 @@ class HeterodyneHarmonic:
         self.ampthr = ampthr
         self.fmin = fmin
         self.fmax = fmax
+        self.include_dc = include_dc
 
         self._fix_params()
         self.extract_partials()
@@ -272,7 +274,10 @@ class HeterodyneHarmonic:
     def f(self):
         tvec = np.arange(self.nsamp)/self.sr
         f0 = np.interp(self.t, tvec, self.f0)
-        return np.array([f0*(n+1) for n in range(self.nharm)]).T
+        if self.include_dc:
+            return np.array([f0*(n) for n in range(self.nharm)]).T
+        else:
+            return np.array([f0*(n+1) for n in range(1,self.nharm)]).T
 
     @property
     def t(self):
@@ -280,7 +285,10 @@ class HeterodyneHarmonic:
 
     @property
     def camp(self):
-        return self.ah
+        if self.include_dc:
+            return self.ah
+        else:
+            return self.ah[:,1:]
     
     @camp.setter
     def camp(self, mx):
@@ -304,19 +312,19 @@ class HeterodyneHarmonic:
 
     def harmonic_times(self, n=1):
         if self.variable_resolution:
-            return self.th[n-1]
+            return self.th[n]
         else:
             return self.th
 
     def harmonic_amplitudes(self, n=1):
         if self.variable_resolution:
-            return self.ah[n-1]
+            return self.ah[n]
         else:
-            return self.ah[:,n-1]
+            return self.ah[:,n]
 
     def harmonic_frequencies(self, n=1):
         if self.variable_resolution:
-            return self.f[self.idxh[n-1]]*n
+            return self.f[self.idxh[n]]*n
         else:
             return self.f[self.idxh]*n
 
@@ -464,9 +472,9 @@ class HeterodyneHarmonic:
         and puts them into a matrix
         """
 
-        for ii in range(1, self.nharm+1):
+        for ii in range(0, self.nharm):
             hh, th = self.extract_partial(ii)
-            self.ah[:,ii-1] = hh
+            self.ah[:,ii] = hh
 
         return self.ah, self.th
 

@@ -277,7 +277,7 @@ class HeterodyneHarmonic:
         if self.include_dc:
             return np.array([f0*(n) for n in range(self.nharm)]).T
         else:
-            return np.array([f0*(n+1) for n in range(1,self.nharm)]).T
+            return np.array([f0*(n) for n in range(1,self.nharm)]).T
 
     @property
     def t(self):
@@ -379,7 +379,6 @@ class HeterodyneHarmonic:
     def set_fvec(self, f0c, th=None, adjust=False):
         tvec = np.arange(len(self.x))/self.sr
 
-   
         if th is not None:
             fvec = np.interp(tvec, th, f0c)
         else:
@@ -388,7 +387,7 @@ class HeterodyneHarmonic:
         # fix for single-frequency values
         if not isinstance(fvec, collections.abc.Sequence):
             fvec = fvec*np.ones(self.nsamp)
-   
+
         self.fvec = fvec/self.sr
         self.fmin = max(self.fmin,min(fvec))
 
@@ -446,7 +445,7 @@ class HeterodyneHarmonic:
 
         return np.real(np.conjugate(hsig)*hf)
         
-    def get_voice_component(x, sr, f, nharm, nfft=2**13, hop=2**11, ampthr=0.1, fmin=70, fmax=500):
+    def get_voice_component(self, x, sr, f, nharm, nfft=2**13, hop=2**11, ampthr=0.1, fmin=70, fmax=500):
         xs = np.zeros(len(x))
         tvec = np.arange(len(x))/sr
         
@@ -477,7 +476,6 @@ class HeterodyneHarmonic:
             self.ah[:,ii] = hh
 
         return self.ah, self.th
-
 
     def resynth(self):
         x = np.zeros(self.nsamp)

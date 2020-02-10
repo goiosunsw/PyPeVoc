@@ -9,6 +9,13 @@ import scipy.signal as sig
 from pypevoc.speech.SpeechChunker import SilenceDetector
 from pypevoc.speech.SpeechSegmenter import SpeechSegmenter
 
+bands = [200.,300.,500.,800.,1200.]
+segmenter_detect_thresh=.5
+chunker_fmin = 100
+chunker_fmax = 1000
+chunker_wind_sec=.2
+chunker_method = 'pct10'
+
 def estimate_noise_background_spcetrum(w, sr, tst, tend, nfft=1024):
     sg, fsg, tsg = sig.specgram(w, fs=sr, NFFT=nfft)
     for ts,te in zip(sd.tend[:-1],sd.tst[1:]):
@@ -84,13 +91,6 @@ def parse_args():
     
 
 if __name__ == '__main__':
-    bands = [200.,300.,500.,800.,1200.]
-    segmenter_detect_thresh=.5
-    chunker_fmin = 100
-    chunker_fmax = 1000
-    chunker_wind_sec=.2
-    chunker_method = 'pct10'
-
     args = parse_args()
     if os.path.isdir(args.input):
         datadir = args.input

@@ -70,7 +70,7 @@ def dpitch2st(f1, f2):
 
 class PV:
     def __init__(self, x, sr, nfft=1024, hop=None, npks=20,
-                 pkthresh=0.005, wind=np.hanning):
+                 pkthresh=0.005, wind=np.hanning, progress=True):
         '''
         Phase vocoder object.
         Arguments:
@@ -125,7 +125,10 @@ class PV:
         self.f = []
         self.ph = []
         self.mag = []
-        self.progress = Progress(end=self.nsamp)
+        if progress:
+            self.progress = Progress(end=self.nsamp)
+        else:
+            self.progress = None
 
     def dphase2freq(self, dph, nbin):
         '''
@@ -244,9 +247,11 @@ class PV:
             t.append((curpos + self.nfft/2.0)/self.sr)
 
             curpos += self.hop
-            self.progress.update(curpos)
+            if self.progress:
+                self.progress.update(curpos)
 
-        self.progress.update(self.nsamp)
+        if self.progress:
+            self.progress.update(self.nsamp)
 
         self.f = np.array(allf)
         self.mag = np.array(allmag)

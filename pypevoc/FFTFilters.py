@@ -334,19 +334,32 @@ class TriangularFilterBank(FilterBank):
         super(TriangularFilterBank,self).__init__(fspec_list=fsl,nwind=nwind,sr=sr,nhop=nhop)
 
 
-
+def nextpow2(x):
+    return 2**(np.ceil(np.log2(x)))
 
 
 
 class MelFilterBank(TriangularFilterBank):
-    def __init__(self,n=26,fmin=300.,fmax=8000.,nwind=256, sr=44100., nhop=None):
+    def __init__(self,n=26,fmin=300.,fmax=8000.,twind=.025, sr=44100., thop=.01):
+        nwind = int(2**np.round(np.log2(twind*sr)))
+        nhop = int(thop*sr)
         melmin = f_to_mel(fmin)
         melmax = f_to_mel(fmax)
         fc = mel_to_f(np.linspace(melmin,melmax,n+2))
 
         super(MelFilterBank,self).__init__(flim=fc,nwind=nwind,sr=sr,nhop=nhop)
-        
-        
+
+    def mfcc(self,w,mode='DCT2'):
+        spec, tspec = self.specout(w)
+        logs = np.log(spec)
+        if mode[:3]=='DCT':
+            dctype = int(mode[3])
+            from scipy.fftpack import dct
+            return dct(logs,type=dctype), tspec
+        elif mode=='IFFT':
+            return np.fft.ifft(logs), tspec
+        else:
+            raise NotImplementedError
     
 def fft_filter(x, bands, gains):
     '''

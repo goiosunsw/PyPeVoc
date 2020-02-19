@@ -280,6 +280,21 @@ class HeterodyneHarmonic:
             return np.array([f0*(n) for n in range(1,self.nharm)]).T
 
     @property
+    def angle_ratios(self):
+        ang = np.angle(self.camp/np.tile(self.camp[:,:1],(1,self.camp.shape[1])))
+        if self.include_dc:
+            ang=np.hstack((np.zeros((ang.shape[0],1)),ang))
+        return ang
+    
+    @property
+    def partial_frequencies(self):
+        dt = self.nhop/self.sr
+        newf=self.f[1:,:]-np.diff(np.unwrap(np.angle(self.camp)),axis=0)/dt/2/np.pi
+        if self.include_dc:
+            newf=np.hstack((np.zeros((newf.shape[0],1)),newf))
+        return newf
+
+    @property
     def t(self):
         return self.th
 
@@ -399,7 +414,7 @@ class HeterodyneHarmonic:
             self.ah = [[] for ii in range(self.nharm)]
             self.idxh = [[] for ii in range(self.nharm)]
         else:
-            self.th = np.arange(self.nwind//2, self.nsamp-self.nwind//2, self.nhop)/self.sr
+            self.th = np.arange(self.nwind//2, self.nsamp-(self.nwind-self.nwind//2), self.nhop)/self.sr
             self.idxh = np.arange(self.nwind//2, self.nsamp-self.nwind//2,
                                   self.nhop).astype('i')
             self.ah = np.zeros((self.th.shape[0],self.nharm),dtype='complex')
@@ -474,6 +489,7 @@ class HeterodyneHarmonic:
         for ii in range(0, self.nharm):
             hh, th = self.extract_partial(ii)
             self.ah[:,ii] = hh
+        self.ah[:,0] /= 2
 
         return self.ah, self.th
 

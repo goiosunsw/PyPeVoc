@@ -33,9 +33,16 @@ def segment_wav(w, sr, fmin=100, fmax=1000, wind_sec=.2,method='pct10'):
     sd = SilenceDetector(w,sr=sr,fmin=fmin,fmax=fmax,wind_sec=wind_sec,method=method)
     return sd.tst, sd.tend
     
+def next_power_2(x):
+    return int(2**np.ceil(np.log2(x)))
+    
 def phoneme_segment_wav(w,sr, bands=[200.,300.,500.,800.,1200.],
-                        detect_thresh=.5):
-    ss = SpeechSegmenter(sr=sr, bands=bands,detect_thresh=detect_thresh)
+                        detect_thresh=.5,twind=0.04):
+    
+    nrough = next_power_2(sr*twind)
+    ss = SpeechSegmenter(sr=sr, bands=bands,
+                         detect_thresh=detect_thresh,
+                         rough_window=nrough)
     ss.set_signal(w,sr=sr)
     tph = ss.process(w)
     tph = ss.refine_all_all_bands()

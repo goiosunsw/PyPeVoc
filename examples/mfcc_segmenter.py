@@ -10,6 +10,27 @@ def read_wav_file(sndfile):
     return wavfile.read(sndfile)
 
 
+def mfcc_change_rate(sr,w, twind=0.025, thop=0.01,
+                     mode='MELSPEC',ncc=12):
+    
+    mfb = ft.MelFilterBank(sr=sr,twind=twind, thop=thop)
+    wp = ft.preemph(w,hpFreq=50,Fs=sr) 
+    if mode == 'MELSPEC':
+        feat,tfeat = mfb.specout(wp)
+        feat = np.log(feat)
+    elif mode == 'MFCC':
+        feat, tfeat = mfb.mfcc(wp)
+        feat = feat[:,1:ncc+1]
+    else:
+        raise NotImplementedError, "{} unknown".format(method)
+
+    ndiff = int(np.round(max_tchange/thop))
+    dfeat = np.zeros((ndiff,len(tfeat)))
+    for ii in range(1,ndiff):
+        dfeat[ii,ndiff:-ndiff] = np.sum((feat[:-ndiff*2,:]-feat[ndiff*2:,:])**2,axis=1)
+    dfsum = np.sum(dfeat,axis=0)
+
+
 def mfcc_segments(sr,w,twind=0.025,thop=0.01,
                   max_tchange=0.05,percentile_thresh=50,
                   mode='MELSPEC',
@@ -22,6 +43,8 @@ def mfcc_segments(sr,w,twind=0.025,thop=0.01,
     elif mode == 'MFCC':
         feat, tfeat = mfb.mfcc(wp)
         feat = feat[:,1:ncc+1]
+    else:
+        raise NotImplementedError, "{} unknown".format(method)
 
     ndiff = int(np.round(max_tchange/thop))
     dfeat = np.zeros((ndiff,len(tfeat)))

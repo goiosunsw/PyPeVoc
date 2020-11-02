@@ -360,6 +360,18 @@ class MelFilterBank(TriangularFilterBank):
             return np.fft.ifft(logs), tspec
         else:
             raise NotImplementedError
+
+    def mfcc_and_mel(self,w,mode='DCT2'):
+        spec, tspec = self.specout(w)
+        logs = np.log(spec)
+        if mode[:3]=='DCT':
+            dctype = int(mode[3])
+            from scipy.fftpack import dct
+            return dct(logs,type=dctype), spec, tspec
+        elif mode=='IFFT':
+            return np.fft.ifft(logs), spec, tspec
+        else:
+            raise NotImplementedError
     
 def fft_filter(x, bands, gains):
     '''

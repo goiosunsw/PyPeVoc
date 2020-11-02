@@ -445,7 +445,7 @@ class HeterodyneHarmonic:
         hf[idx] = 0
         return hf
 
-    def resynth_partial(self, n):
+    def resynth_partial(self, n, filter=False):
         """
         resynthesises a partial based on extracted complex amplitudes
         """
@@ -456,7 +456,8 @@ class HeterodyneHarmonic:
 
         hf = np.interp(tvec, th, h)
         ff = self.fvec
-        hf = self.filter_harmonic(n)
+        if filter:
+            hf = self.filter_harmonic(n)
 
         return np.real(np.conjugate(hsig)*hf)
         

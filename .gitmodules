@@ -1,0 +1,3 @@
+[submodule "pypevoc/Yin"]
+	path = pypevoc/Yin
+	url = https://github.com/goiosunsw/Yin

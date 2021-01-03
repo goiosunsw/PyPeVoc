@@ -206,7 +206,7 @@ class Periodicity(object):
         if not ax:
             fig, ax = pl.subplots(1)
         ln = ax.plot(np.arange(len(xc))-self.nwind+1, xc)
-        ax.hold('on')
+        # ax.hold('on')
         ax.plot(self.cand_period, self.cand_strength, 'o',
                 color=ln[0].get_color())
 

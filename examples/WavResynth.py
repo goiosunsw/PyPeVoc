@@ -5,7 +5,7 @@ import sys
 from scipy.io import wavfile as wf
 
 sys.path.append('..')
-import PVAnalysis as pv
+from pypevoc import PVAnalysis as pv
 
 #sr, sig =  wf.read('pepperCl.wav')
 sr, sig =  wf.read('pepperSx.wav')
@@ -38,14 +38,14 @@ w=ss.synth(sr,mypv.hop/1)
 # plot original and resynthesis
 pl.figure()
 pl.plot(sig,label='orig')
-pl.hold(True)
+# pl.hold(True)
 pl.plot(w,label='resynth')
 pl.legend()
 pl.show()
 
 fig,ax=pl.subplots(2,1,sharex=True)
 ax[0].plot(np.arange(len(sig))/float(sr),sig,label='orig')
-ax[0].hold(True)
+# ax[0].hold(True)
 ax[0].plot(np.arange(len(w))/float(sr),w,label='resynth')
 ax[0].legend()
 mypv.plot_time_freq(ax=ax[1])

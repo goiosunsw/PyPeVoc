@@ -48,7 +48,7 @@ for n,ha in enumerate(hamp0):
     
 #pl.plot(sig)
 pl.figure()
-ss=pl.specgram(sig,NFFT=1024/2)
+ss=pl.specgram(sig,NFFT=1024//2)
 
 mypv=pv.PV(sig,sr,nfft=1024,npks=len(hamp0))
 mypv.run_pv()
@@ -61,6 +61,6 @@ w=ss.synth(sr,mypv.hop/1)
 
 #pl.hold(True)
 pl.plot(sig,label='orig')
-pl.hold(True)
+# pl.hold(True)
 pl.plot(w,label='resynth')
 pl.legend()

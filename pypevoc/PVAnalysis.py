@@ -1002,10 +1002,10 @@ class SinSum(object):
     def plot_time_freq(self, minlen=10):
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             pl.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
-        pl.hold(False)
+        # pl.hold(False)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
         # pl.show()
@@ -1015,14 +1015,14 @@ class SinSum(object):
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
         ax1 = pl.subplot(211)
-        pl.hold(True)
+        # pl.hold(True)
         ax2 = pl.subplot(212, sharex=ax1)
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             ax1.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
             ax2.plot(pp.start_idx + np.arange(len(pp.f)),
                      20*np.log10(np.array(pp.mag)))
-        ax1.hold(False)
+        # ax1.hold(False)
         # ax1.xlabel('Time (s)')
         ax1.set_ylabel('Frequency (Hz)')
         ax2.set_xlabel('Time (s)')
@@ -1038,14 +1038,14 @@ class SinSum(object):
 
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             # pl.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
             mag = 100 + 20*np.log10(np.array(pp.mag))
             pl.scatter(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f),
                        s=mag, c=cm(ccur), lw=0)
             ccur = np.mod(ccur + cadd, cmax)
-        pl.hold(False)
+        # pl.hold(False)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
         pl.show()

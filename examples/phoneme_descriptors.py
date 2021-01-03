@@ -119,7 +119,7 @@ def output_interval(w,sr,ts,te,label):
         traceback.print_exc()
         desc = {}
     dstr = '{:.3f}, {:.3f}, {}'.format(ts,te,label)
-    for k,v in desc.items():
+    for k,v in list(desc.items()):
         dstr+=',{}'.format(v)
     print(dstr)
 

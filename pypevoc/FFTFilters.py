@@ -400,7 +400,7 @@ def fft_filter(x, bands, gains):
             ffilter[-fmax+1:-fmin+1]=np.linspace(gg[1],gg[0],fmax-fmin)
         else:
             ffilter[-fmax+1:]=np.linspace(gg[1],gg[0],fmax-fmin-1)
-        print('{}-{} : gains [{}, {}]'.format(fmin,fmax,gg[0],gg[1]))
+        print(('{}-{} : gains [{}, {}]'.format(fmin,fmax,gg[0],gg[1])))
         
     xf_filt = xf*ffilter
     return np.fft.ifft(xf_filt) 

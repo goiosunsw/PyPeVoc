@@ -68,10 +68,10 @@ def process_file(sndfile):
         ts = thisi['start']
         te = thisi['end']
         tph = thisi['phonemes']
-        print('{:7.3f}, Speech START'.format(ts))
+        print(('{:7.3f}, Speech START'.format(ts)))
         for t in tph:
-            print('{:7.3f}, New phoneme'.format(t+ts))
-        print('{:7.3f}, Speech END'.format(te))
+            print(('{:7.3f}, New phoneme'.format(t+ts)))
+        print(('{:7.3f}, Speech END'.format(te)))
 
 def process_dir(directory):
     from glob import glob
@@ -83,10 +83,10 @@ def process_dir(directory):
             ts = thisi['start']
             te = thisi['end']
             tph = thisi['phonemes']
-            print('{}, {:7.3f}, Speech START'.format(sndfile,ts))
+            print(('{}, {:7.3f}, Speech START'.format(sndfile,ts)))
             for t in tph:
-                print('{}, {:7.3f}, New phoneme'.format(sndfile,t+ts))
-            print('{}, {:7.3f}, Speech END'.format(sndfile,te))
+                print(('{}, {:7.3f}, New phoneme'.format(sndfile,t+ts)))
+            print(('{}, {:7.3f}, Speech END'.format(sndfile,te)))
         
 
 

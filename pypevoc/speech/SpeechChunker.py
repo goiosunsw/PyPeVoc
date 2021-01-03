@@ -272,7 +272,7 @@ class MultiChannelSegmenter(object):
         # index of cluster corresponding to silence
         idx_silence = np.argmin(np.sum(mbk.cluster_centers_,axis=1))
         cc[0,:] = mbk.cluster_centers_[idx_silence,:]
-        idx_free = range(cc.shape[0])
+        idx_free = list(range(cc.shape[0]))
         idx_free.remove(idx_silence)
         cred = mbk.cluster_centers_-cc[0,:]
         # remaining indexes, sort them by channel
@@ -395,7 +395,7 @@ class MultiChannelSegmenter(object):
             except srec.UnknownValueError:
                 print("Speech Recognition could not understand audio")
             except srec.RequestError as e:
-                print("Could not request results {}".format(e))
+                print(("Could not request results {}".format(e)))
         
 def output_results(seg, output_csv='', output_text_grid=''):
     if output_text_grid:

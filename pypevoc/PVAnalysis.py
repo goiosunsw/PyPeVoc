@@ -682,6 +682,7 @@ class RegPartial(object):
         return mag * np.cos(ph), (self.start_idx)*hop
 
     def synth(self, sr, hop, intermediate=False, edge=.5):
+        hop = int(hop)
         nfr = len(self.f)
         # frame delay due to averaging and overlap
         dfr = 1./self.overlap/2.
@@ -700,7 +701,7 @@ class RegPartial(object):
         # except NameError:
         fsig = np.interp(newt, hop*(dfr + .5 + np.arange(nfr)), self.f)
         msig = np.interp(newt, hop*(dfr + np.arange(nfr)), self.mag)
-        for ii in xrange(nfr):
+        for ii in range(nfr):
             # fsam = self.f[ii]*np.ones(hop - 1)
             fsam = fsig[hop*ii:(hop*(ii+1) - 1)]
             # msam = np.interp(self.mag[ii]
@@ -764,7 +765,7 @@ class RegPartial(object):
         thisph = np.zeros_like(self.ph)
         # msig = np.interp(newt, hop*(dfr+np.arange(nfr)), self.mag)
         msig = self.mag
-        for ii in xrange(nfr - 1):
+        for ii in range(nfr - 1):
             ph = 0.
 
             # phase correction for variable frequency
@@ -844,7 +845,7 @@ class SinSum(object):
             pmag = [self.partial[ii].get_mag_at_frame(fr - 1) for ii in pidx]
 
             # zips, sorts and unzips
-            pmag, pidx = zip(*sorted(zip(pmag, pidx), reverse=True))
+            pmag, pidx = list(zip(*sorted(zip(pmag, pidx), reverse=True)))
             partials = [self.partial[ii] for ii in pidx]
             prev_f = [pp.get_freq_at_frame(fr-1) for pp in partials]
 
@@ -890,7 +891,7 @@ class SinSum(object):
             # get all magnitudes in previous frame
             pmag = [self.partial[ii].get_mag_at_frame(fr-1) for ii in pidx]
             # sort partials per magnitude
-            allpmagl, pidx = zip(*sorted(zip(pmag, pidx), reverse=True))
+            allpmagl, pidx = list(zip(*sorted(zip(pmag, pidx), reverse=True)))
 
             allpidx = np.array(pidx)
             allpmag = np.array(allpmagl)
@@ -1002,10 +1003,10 @@ class SinSum(object):
     def plot_time_freq(self, minlen=10):
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             pl.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
-        pl.hold(False)
+        # pl.hold(False)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
         # pl.show()
@@ -1015,14 +1016,14 @@ class SinSum(object):
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
         ax1 = pl.subplot(211)
-        pl.hold(True)
+        # pl.hold(True)
         ax2 = pl.subplot(212, sharex=ax1)
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             ax1.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
             ax2.plot(pp.start_idx + np.arange(len(pp.f)),
                      20*np.log10(np.array(pp.mag)))
-        ax1.hold(False)
+        # ax1.hold(False)
         # ax1.xlabel('Time (s)')
         ax1.set_ylabel('Frequency (Hz)')
         ax2.set_xlabel('Time (s)')
@@ -1038,22 +1039,23 @@ class SinSum(object):
 
         part = [pp for pp in self.partial if len(pp.f) > minlen]
         pl.figure()
-        pl.hold(True)
+        # pl.hold(True)
         for pp in part:
             # pl.plot(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f))
             mag = 100 + 20*np.log10(np.array(pp.mag))
             pl.scatter(pp.start_idx + np.arange(len(pp.f)), np.array(pp.f),
                        s=mag, c=cm(ccur), lw=0)
             ccur = np.mod(ccur + cadd, cmax)
-        pl.hold(False)
+        # pl.hold(False)
         pl.xlabel('Time (s)')
         pl.ylabel('Frequency (Hz)')
         pl.show()
 
     def synth(self, sr, hop, edge=1.0, minframes=3, phase_preserve=True):
+        hop = int(hop)
         # edges
         dfr = self.nfft/self.hop/2.
-        edgsamp = edge*hop*dfr
+        edgsamp = int(edge*hop*dfr)
 
         # fixme: why +2???
         w = np.zeros((max(self.end) + 2)*hop + 2*edgsamp)

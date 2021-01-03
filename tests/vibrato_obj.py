@@ -27,7 +27,7 @@ def SlopeToHmult(slope, nharm):
     
     base = np.exp(slope)
     hamp = []
-    for i in xrange(nharm):
+    for i in range(nharm):
         hn = i
         hamp.append(base**(hn-(nharm-1)/2.0))
         #hamp.append(np.sqrt(((hn/float(nharm-1)-.5 )*2.*(-slope)+1.)/nharm)) 
@@ -76,7 +76,7 @@ class SlopeHarmonicScaler(object):
         '''
         hh = []
         cent = val*(self.nharm-1.)+1.
-        for ii in xrange(self.nharm):
+        for ii in range(self.nharm):
             hh.append(self.fharm[ii](cent))
         return np.array(hh)
     
@@ -100,7 +100,7 @@ class SlopeHarmonicScaler(object):
         '''
         self.fharm=[]
         
-        for ii in xrange(self.nharm):
+        for ii in range(self.nharm):
             ff = interp1d(self.cent, self.hamp[...,ii], kind='cubic')
             self.fharm.append(ff)
         
@@ -113,7 +113,7 @@ class SlopeHarmonicScaler(object):
 
         sys.stdout.write("scvals = [ \n")
 
-        for ii in xrange(npoints+1):
+        for ii in range(npoints+1):
             vrange = max(vlims) - min(vlims)
             cent = min(vlims) + ii * vrange / float(npoints)
             hamp = self(cent)
@@ -334,16 +334,16 @@ def SlopeVibratoWAV(filename='out.wav',
     #sr=44100
     base = np.exp(slope)
     
-    print vib_slope
+    print(vib_slope)
     fact = 20./np.log(10)
     if vib_slope>0.0:
-        hvib = [(float(hn)-(nharm-2.0)/2.0)*hdepth for hn in xrange(nharm-1)]
+        hvib = [(float(hn)-(nharm-2.0)/2.0)*hdepth for hn in range(nharm-1)]
     else:
-        hvib = [hdepth for hn in xrange(nharm-1)]
-    print hvib
+        hvib = [hdepth for hn in range(nharm-1)]
+    print(hvib)
     #hvib = [fact*np.log10((hn-(nharm+1.0)/2.0)*slope) for hn in xrange(nharm-1)]
     
-    hamp = np.array([(1.)**xx/xx**slope for xx in xrange(1,nharm)])
+    hamp = np.array([(1.)**xx/xx**slope for xx in range(1,nharm)])
     #hamp = np.concatenate(([0],hamp))
     #hamp = np.zeros(nharm)
     #f0tonic = 500.

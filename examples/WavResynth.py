@@ -19,7 +19,7 @@ sig = sig/ float(np.iinfo(sig.dtype).max)
     
 #pl.plot(sig)
 pl.figure()
-ss=pl.specgram(sig,NFFT=1024/2)
+ss=pl.specgram(sig,NFFT=1024//2)
 
 # Build the phase vocoder object
 mypv=pv.PV(sig,sr,nfft=1024*4,npks=25*4,hop=256*4)

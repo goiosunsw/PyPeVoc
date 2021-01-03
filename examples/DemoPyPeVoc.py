@@ -2,8 +2,8 @@ import numpy  as np
 import pylab  as pl
 import pandas as pd
 import sys
-sys.path.append('..')
-import PVAnalysis as pv
+# sys.path.append('..')
+from pypevoc import PVAnalysis as pv
 
 # Sample rate
 sr = 44100

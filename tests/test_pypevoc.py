@@ -23,4 +23,4 @@ ss=p.toSinSum()
 for ii,part in enumerate(ss.partial):
     avmag = np.mean(part.mag)
     if avmag > minmag:
-        print('Partial %d, st=%d, len=%d, f=%f, mag =%f'%(ii,part.start_idx,len(part.f),np.mean(part.f),avmag))
+        print(('Partial %d, st=%d, len=%d, f=%f, mag =%f'%(ii,part.start_idx,len(part.f),np.mean(part.f),avmag)))

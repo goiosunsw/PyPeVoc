@@ -700,7 +700,7 @@ class RegPartial(object):
         # except NameError:
         fsig = np.interp(newt, hop*(dfr + .5 + np.arange(nfr)), self.f)
         msig = np.interp(newt, hop*(dfr + np.arange(nfr)), self.mag)
-        for ii in xrange(nfr):
+        for ii in range(nfr):
             # fsam = self.f[ii]*np.ones(hop - 1)
             fsam = fsig[hop*ii:(hop*(ii+1) - 1)]
             # msam = np.interp(self.mag[ii]
@@ -764,7 +764,7 @@ class RegPartial(object):
         thisph = np.zeros_like(self.ph)
         # msig = np.interp(newt, hop*(dfr+np.arange(nfr)), self.mag)
         msig = self.mag
-        for ii in xrange(nfr - 1):
+        for ii in range(nfr - 1):
             ph = 0.
 
             # phase correction for variable frequency
@@ -844,7 +844,7 @@ class SinSum(object):
             pmag = [self.partial[ii].get_mag_at_frame(fr - 1) for ii in pidx]
 
             # zips, sorts and unzips
-            pmag, pidx = zip(*sorted(zip(pmag, pidx), reverse=True))
+            pmag, pidx = list(zip(*sorted(zip(pmag, pidx), reverse=True)))
             partials = [self.partial[ii] for ii in pidx]
             prev_f = [pp.get_freq_at_frame(fr-1) for pp in partials]
 
@@ -890,7 +890,7 @@ class SinSum(object):
             # get all magnitudes in previous frame
             pmag = [self.partial[ii].get_mag_at_frame(fr-1) for ii in pidx]
             # sort partials per magnitude
-            allpmagl, pidx = zip(*sorted(zip(pmag, pidx), reverse=True))
+            allpmagl, pidx = list(zip(*sorted(zip(pmag, pidx), reverse=True)))
 
             allpidx = np.array(pidx)
             allpmag = np.array(allpmagl)

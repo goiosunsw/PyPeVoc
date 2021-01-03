@@ -464,8 +464,8 @@ class PeriodSeries(object):
                           s=per.cand_strength*100,
                           c=cols[0:nc], alpha=.5)
 
-        ax[0].plot(*zip(*[[per.time, float(per.get_preferred_period())]
-                        for per in self.periods]), color='k')
+        ax[0].plot(*list(zip(*[[per.time, float(per.get_preferred_period())]
+                        for per in self.periods])), color='k')
 
         ax[1].plot(self.get_times(), self.get_strength())
 

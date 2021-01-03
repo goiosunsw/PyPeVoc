@@ -432,7 +432,7 @@ class PeakFinder(object):
             rough: do not return the refined position
         """
 
-        rvec = np.array(zip(self.pos, self.val))
+        rvec = np.array(list(zip(self.pos, self.val)))
 
         return rvec
 

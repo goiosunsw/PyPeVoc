@@ -29,7 +29,7 @@
 
 import sys
 import numpy as np
-import PeakFinder as pf
+from . import PeakFinder as pf
 import pylab as pl
 from matplotlib.colors import hsv_to_rgb
 

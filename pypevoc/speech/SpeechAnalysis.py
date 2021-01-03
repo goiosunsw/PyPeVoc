@@ -398,7 +398,7 @@ def FricativeDataFromWav(wavname, intervals=[], pos=[0.5],
     for st,end in intervals:
         kept=[]
         for pp in pos:
-            print('{:.3f}-{:.3f} @ {}'.format(st,end,pp))
+            print(('{:.3f}-{:.3f} @ {}'.format(st,end,pp)))
             try:
                 duration = end-st
                 imed = int((st+duration*(pp))*sr)
@@ -417,7 +417,7 @@ def FricativeDataFromWav(wavname, intervals=[], pos=[0.5],
 
                 fdict[pos].append(fricdata)
             except ValueError as e:
-                print(' ERROR at {}-{}'.format(st,end))
+                print((' ERROR at {}-{}'.format(st,end)))
                 print(e)
                 fdict[pos].append([])
     return fdict

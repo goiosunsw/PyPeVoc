@@ -319,7 +319,7 @@ class HeterodyneHarmonic:
         if self.nper is not None:
             self.variable_resolution = True
             self.nwind = int(round(self.nper/self.fmin))
-            print('window set to %d'%self.nwind)
+            print(('window set to %d'%self.nwind))
         else:
             self.variable_resolution = False
 

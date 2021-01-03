@@ -32,8 +32,8 @@ def FftFilter(x, bands, gains):
         else:
             ffilter[-fmax+1:] = np.linspace(gg[1], gg[0],
                                             fmax-fmin-1)
-        print('{}-{} : gains [{}, {}]'.format(fmin, fmax,
-                                              gg[0], gg[1]))
+        print(('{}-{} : gains [{}, {}]'.format(fmin, fmax,
+                                              gg[0], gg[1])))
 
     xf_filt = xf*ffilter
     return np.fft.ifft(xf_filt)
@@ -252,7 +252,7 @@ def aubio_f0yin(y, sr, nwind=1024, hop=512,
     time = []
     conf = []
 
-    for ii in xrange(0,nsamples-nwind, hop):
+    for ii in range(0,nsamples-nwind, hop):
         thisy = y[ii:ii+nwind]
         vs[:] = thisy
         time.append(float(ii+nwind/2)/sr)

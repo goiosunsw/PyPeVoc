@@ -590,7 +590,7 @@ class SyllableSegmenter(object):
         nwind = int(window_sec*self.sr)
         nhop  = int(hop_sec*self.sr)
         
-        import SpeechChunker as sc
+        from . import SpeechChunker as sc
         co = sc.SilenceDetector(self.w, sr=self.sr, method = method,
                                 min_len=min_len, max_len=max_len)
 

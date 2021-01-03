@@ -115,7 +115,7 @@ def process_file_list(batch_file):
 def main(args):
 
     sound_files = args.infiles
-    print sound_files
+    print(sound_files)
     
     if args.batch:
         process_file_list(args.batch)

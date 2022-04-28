@@ -8,7 +8,7 @@ def my_tests():
     return test_suite
 
 setup(name='pypevoc',
-      version='0.1',
+      version='0.2',
       description='Pure python sound analysis tools',
       url='http://github.com/goiosunw/pypevoc',
       author='Andre Goios',

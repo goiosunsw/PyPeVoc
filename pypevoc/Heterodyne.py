@@ -60,6 +60,43 @@ def heterodyne(x, hetsig, wind=None, hop=None):
     return np.array(ret)*2,np.array(icent)
 
 
+def heterodyne_corr(x,sr,f,maxwind=2**14,nhop=2**10,nper=3,dc_cut=50, release_partials=True):
+    """
+    Heterodyne from sequential residuals
+
+    Performs partial heterodyne detection on a signal x for partials
+    at frequency f.
+    
+    release_partials: heterodynes are performed sequenctially on the
+    residuals from previous partial detections
+    """
+    xx = x.copy()
+    t = np.arange(len(x))/sr
+
+    nharm = len(f)
+    ret = []
+    part = np.zeros((len(x),nharm))
+    for ii,ff in enumerate(f):
+        if ff==0.:
+            nwind=maxwind
+        foth = np.delete(f,ii)
+        nwind = (sr/np.min(np.abs(foth-ff))*nper)
+        print(nwind)
+        hetsig = np.exp(1j*2*np.pi*ff*t)
+        if release_partials:
+            cc,ih = heterodyne(xx,hetsig,wind=np.hanning(nwind),hop=nhop)
+        else:
+            cc,ih = heterodyne(x,hetsig,wind=np.hanning(nwind),hop=nhop)
+        if ff==0.:
+            cc/=2
+        th=ih/sr
+        ret.append(ts.SampledTimeSeries(cc,th,label='%.2f'%ff))
+        ret[-1].f = ff
+        hf = np.interp(t,th,cc)
+        xp = np.real(np.conjugate(hf)*hetsig)
+        xx-=xp
+        part[:,ii]=xp
+    return ret,xx,part
 
 class Heterodyne(object):
     """

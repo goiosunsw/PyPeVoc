@@ -22,7 +22,7 @@ def mfcc_change_rate(sr,w, twind=0.025, thop=0.01,
         feat, tfeat = mfb.mfcc(wp)
         feat = feat[:,1:ncc+1]
     else:
-        raise NotImplementedError, "{} unknown".format(method)
+        raise NotImplementedError("{} unknown".format(method))
 
     ndiff = int(np.round(max_tchange/thop))
     dfeat = np.zeros((ndiff,len(tfeat)))
@@ -44,7 +44,7 @@ def mfcc_segments(sr,w,twind=0.025,thop=0.01,
         feat, tfeat = mfb.mfcc(wp)
         feat = feat[:,1:ncc+1]
     else:
-        raise NotImplementedError, "{} unknown".format(method)
+        raise NotImplementedError("{} unknown".format(method))
 
     ndiff = int(np.round(max_tchange/thop))
     dfeat = np.zeros((ndiff,len(tfeat)))
@@ -72,7 +72,7 @@ def process_file(sndfile, mode='MELSPEC'):
     sr,w = read_wav_file(sndfile)
     times, values = mfcc_segments(sr,w,mode=mode)
     for t,v in zip(times, values):
-        print("{:f},{:f}".format(t,v))
+        print(("{:f},{:f}".format(t,v)))
 
 
 def process_dir(directory):
@@ -85,10 +85,10 @@ def process_dir(directory):
             ts = thisi['start']
             te = thisi['end']
             tph = thisi['phonemes']
-            print('{}, {:7.3f}, Speech START'.format(sndfile,ts))
+            print(('{}, {:7.3f}, Speech START'.format(sndfile,ts)))
             for t in tph:
-                print('{}, {:7.3f}, New phoneme'.format(sndfile,t+ts))
-            print('{}, {:7.3f}, Speech END'.format(sndfile,te))
+                print(('{}, {:7.3f}, New phoneme'.format(sndfile,t+ts)))
+            print(('{}, {:7.3f}, Speech END'.format(sndfile,te)))
         
 
 

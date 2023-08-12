@@ -119,7 +119,7 @@ class Periodicity(object):
         peaks = None
 
         try:
-            if self.method is 'amdf':
+            if self.method == 'amdf':
                 xc = amdf(xw)
 
                 maxxc = max(xc[nwind-1-self.maxdelay:nwind-1+self.maxdelay])
@@ -128,7 +128,7 @@ class Periodicity(object):
                 xcpos = xcn[imin:self.maxdelay]
                 xcth = self.threshold
 
-            elif self.method is 'xcorr':
+            elif self.method == 'xcorr':
 
                 xc = np.correlate(xw, xw, "full") / self.wnorm
 
@@ -282,18 +282,18 @@ class PeriodSeries(object):
 
         self.nx = len(x)
 
-        if fmin is None:
+        if fmin == None:
             maxdelay = None
         else:
             maxdelay = int(sr/fmin)
 
-        if fmax is None:
+        if fmax == None:
             mindelay = 2
         else:
             mindelay = int(sr/fmax)
 
-        if window is None:
-            if maxdelay is None:
+        if window == None:
+            if maxdelay == None:
                 window = self.nx
             else:
                 window = 3*maxdelay
@@ -337,7 +337,7 @@ class PeriodSeries(object):
         Arguments: (None)
         """
 
-        if self.method is 'xcorr':
+        if self.method == 'xcorr':
             w = self.wind
             self.wnorm = np.correlate(w, w, "full")
         else:
@@ -390,7 +390,7 @@ class PeriodSeries(object):
 
         sys.stderr.write("\ndone\n"  )
 
-        if threshold is not None:
+        if threshold == None:
             self.threshold = oldthresh
 
     def calcPeriodByPeriod(self, threshold=None, 
@@ -405,7 +405,7 @@ class PeriodSeries(object):
         """
 
         self.periods = []
-        if threshold is not None:
+        if threshold != None:
             oldthresh = self.threshold
             self.threshold = threshold
 
@@ -440,7 +440,7 @@ class PeriodSeries(object):
         self.progress.update(self.nx)
         sys.stdout.write("\ndone\n") 
 
-        if threshold is not None:
+        if threshold != None:
             self.threshold = oldthresh
 
     def plot_candidates(self):
@@ -640,7 +640,7 @@ def period_marks_peak(x, sr=1.0, tf=None, f=[], fit_points=3):
     # build time vector for signal
     tx = np.arange(len(x))/(sr)
     # interpolate frequency values
-    if tf is None:
+    if tf == None:
         try:
             assert(len(f) == len(x))
         except(TypeError):
